@@ -1165,9 +1165,9 @@ public:
 
 		ctx->FloatSave.StatusWord = this->i386core->s.fpu_regs.status;
 		ctx->FloatSave.ControlWord = this->i386core->s.fpu_regs.control;
-		if (((ctx->FloatSave.ControlWord >> 10) & 3) != (this->i386core->s.fpu_stat.round & 3)) { ctx->FloatSave.ControlWord &= ~(3 << 10); ctx->FloatSave.ControlWord |= ((FP_RND)((this->i386core->s.fpu_stat.round & 3) << 10)); }
-		if (((ctx->FloatSave.ControlWord >>  8) & 3) != (this->i386core->s.fpu_stat.pc    & 3)) { ctx->FloatSave.ControlWord &= ~(3 <<  8); ctx->FloatSave.ControlWord |= ((UINT8)((this->i386core->s.fpu_stat.pc     & 3) << 8 )); }
-		if (((ctx->FloatSave.StatusWord  >> 11) & 7) != (this->i386core->s.fpu_stat.top   & 7)) { ctx->FloatSave.StatusWord  &= ~(7 << 11); ctx->FloatSave.StatusWord  |= ((UINT8)((this->i386core->s.fpu_stat.top    & 7) << 11)); }
+		if (((ctx->FloatSave.ControlWord >> 10) & 3) != (this->i386core->s.fpu_stat.round & 3)) { ctx->FloatSave.ControlWord &= ~(3 << 10); ctx->FloatSave.ControlWord |= ((DWORD)((this->i386core->s.fpu_stat.round & 3) << 10)); }
+		if (((ctx->FloatSave.ControlWord >>  8) & 3) != (this->i386core->s.fpu_stat.pc    & 3)) { ctx->FloatSave.ControlWord &= ~(3 <<  8); ctx->FloatSave.ControlWord |= ((DWORD)((this->i386core->s.fpu_stat.pc    & 3) << 8 )); }
+		if (((ctx->FloatSave.StatusWord  >> 11) & 7) != (this->i386core->s.fpu_stat.top   & 7)) { ctx->FloatSave.StatusWord  &= ~(7 << 11); ctx->FloatSave.StatusWord  |= ((DWORD)((this->i386core->s.fpu_stat.top   & 7) << 11)); }
 		ctx->FloatSave.TagWord = 0;
 		for (int i = 0; i < 8; i++) {
 			//ctx->FloatSave.TagWord |= (((this->i386core->s.fpu_stat.tag[i] == 0) ? TAG_Empty : TAG_Valid) << (2 * i));
