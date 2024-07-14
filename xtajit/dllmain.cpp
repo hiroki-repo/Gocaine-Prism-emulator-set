@@ -1117,6 +1117,10 @@ public:
 
 		this->i386core->s.fpu_regs.status = ctx->FloatSave.StatusWord;
 		this->i386core->s.fpu_regs.control = ctx->FloatSave.ControlWord;
+		this->i386core->s.fpu_stat.round = ((FP_RND)((ctx->FloatSave.ControlWord >> 10) & 3));
+		this->i386core->s.fpu_stat.pc = ((UINT8)((ctx->FloatSave.ControlWord >> 8) & 3));
+		this->i386core->s.fpu_stat.rc = ((UINT8)((ctx->FloatSave.ControlWord >> 10) & 3));
+		this->i386core->s.fpu_stat.top = ((UINT8)((ctx->FloatSave.StatusWord >> 11) & 7));
 		for (int i = 0; i < 8; i++) {
 			this->i386core->s.fpu_stat.tag[i] = ((FP_TAG)((ctx->FloatSave.TagWord >> (2 * i)) & 3));
 			/*if ((ctx->FloatSave.TagWord >> (2 * i)) & 3) this->i386core->s.fpu_stat.tag[i] = TAG_Zero;
