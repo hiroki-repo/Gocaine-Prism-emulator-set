@@ -324,6 +324,7 @@ class ARMV7_CPU {
     std::string decode_datamisc(int64_t inst, int64_t addr);
     std::string decode_media(int64_t inst, int64_t addr);
     std::string decode(int64_t inst, int64_t addr);
+    std::string decode_thumb(int64_t inst, int64_t addr);
 
     void dump(std::string inst_name, int64_t inst, int64_t addr);
     int  file_read();

@@ -1405,3 +1405,16 @@ std::string ARMV7_CPU::decode(int64_t inst, int64_t addr)
     abort_unknown_inst(inst, addr);
     return "null";
 };
+std::string ARMV7_CPU::decode_thumb(int64_t inst, int64_t addr)
+{
+    uint64_t instu = inst;
+
+    switch ((instu >> 14) & 3) {
+    case 0:
+        switch ((instu >> 14) & 3) {
+        }
+        break;
+    }
+    abort_unknown_inst(inst, addr);
+    return "null";
+};
