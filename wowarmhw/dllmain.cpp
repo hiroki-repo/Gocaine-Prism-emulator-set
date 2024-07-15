@@ -6,6 +6,8 @@
 #include "stdlib.h"
 #include "ntstatus.h"
 
+#include "../ARMv7/ARM/ARMv7_cpu.h"
+
 #pragma warning(disable:4996)
 
 typedef WINBASEAPI
@@ -738,6 +740,43 @@ typedef struct _WOW64INFO
 	USHORT  EmulatedMachineType;
 } WOW64INFO;
 
+UINT32 memaccessfunc(UINT32 prm_0, UINT32 prm_1, UINT32 prm_2) {
+	switch (prm_2 & 0xF) {
+	case 0:
+		switch ((prm_2 >> 4) & 0xF) {
+		case 0:
+			*(UINT8*)(prm_0) = (UINT8)(prm_1 & 0xFF);
+			return 0;
+			break;
+		case 1:
+			*(UINT16*)(prm_0) = (UINT16)(prm_1 & 0xFFFF);
+			return 0;
+			break;
+		case 2:
+			*(UINT32*)(prm_0) = (UINT32)(prm_1 & 0xFFFFFFFF);
+			return 0;
+			break;
+		}
+		return 0;
+		break;
+	case 1:
+		switch ((prm_2 >> 4) & 0xF) {
+		case 0:
+			return *(UINT8*)(prm_0);
+			break;
+		case 1:
+			return *(UINT16*)(prm_0);
+			break;
+		case 2:
+			return *(UINT32*)(prm_0);
+			break;
+		}
+		return 0;
+		break;
+	}
+	return 0;
+}
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -749,6 +788,81 @@ extern "C" {
     __declspec(dllexport) NTSTATUS WINAPI BTCpuResetToConsistentState(EXCEPTION_POINTERS* ptrs) { return STATUS_SUCCESS; }
     __declspec(dllexport) NTSTATUS WINAPI BTCpuSetContext(HANDLE thread, HANDLE process, void* unknown, ARM_CONTEXT* ctx) { return NtSetInformationThread_alternative(thread, ThreadWow64Context, ctx, sizeof(*ctx)); }
     __declspec(dllexport) void WINAPI BTCpuSimulate(void) {
+		ARM_CONTEXT* wow_context;
+		NTSTATUS ret;
+		RtlWow64GetCurrentCpuArea(NULL, (void**)&wow_context, NULL);
+		IRQ* emuirq = new IRQ(0xF8000000);
+		DTimer* emudtimer = new DTimer(0xFC000000, 0, emuirq);
+		Mem* emumem = new Mem(memaccessfunc, 2);
+		ARMV7_CPU* armv7cpu = new ARMV7_CPU(emumem,emudtimer);
+		armv7cpu->regs[0] = wow_context->R0;
+		armv7cpu->regs[1] = wow_context->R1;
+		armv7cpu->regs[2] = wow_context->R2;
+		armv7cpu->regs[3] = wow_context->R3;
+		armv7cpu->regs[4] = wow_context->R4;
+		armv7cpu->regs[5] = wow_context->R5;
+		armv7cpu->regs[6] = wow_context->R6;
+		armv7cpu->regs[7] = wow_context->R7;
+		armv7cpu->regs[8] = wow_context->R8;
+		armv7cpu->regs[9] = wow_context->R9;
+		armv7cpu->regs[10] = wow_context->R10;
+		armv7cpu->regs[11] = wow_context->R11;
+		armv7cpu->regs[12] = wow_context->R12;
+		armv7cpu->regs[13] = wow_context->Sp;
+		armv7cpu->regs[14] = wow_context->Lr;
+		armv7cpu->regs[15] = wow_context->Pc;
+		armv7cpu->cpsr = armv7cpu->parse_psr(wow_context->Cpsr);
+		while (((armv7cpu->regs[15]) & 0xFFFFFFFE) != (((UINT32)&bopcode) & 0xFFFFFFFE) && ((armv7cpu->regs[15]) & 0xFFFFFFFE) != (((UINT32)&unixbopcode) & 0xFFFFFFFE)) {
+			{
+				armv7cpu->regs[15] &= 0xFFFFFFFE;
+				armv7cpu->regs[15] |= ((armv7cpu->cpsr.t) & 1);
+				if (armv7cpu->cpsr.t) {// Thumb-2
+					UINT64 opcodeaddr4arm = armv7cpu->regs[15] & 0xFFFFFFFE;
+					UINT64 opcode4arm = armv7cpu->fetch_instruction(opcodeaddr4arm);
+					armv7cpu->exec(armv7cpu->decode_thumb(opcode4arm, opcodeaddr4arm), opcode4arm, opcodeaddr4arm);
+					armv7cpu->regs[15] += 2;
+				}
+				else 				  {// AArch32
+					UINT64 opcodeaddr4arm = armv7cpu->regs[15] & 0xFFFFFFFC;
+					UINT64 opcode4arm = armv7cpu->fetch_instruction(opcodeaddr4arm);
+					armv7cpu->exec(armv7cpu->decode(opcode4arm, opcodeaddr4arm), opcode4arm, opcodeaddr4arm);
+					armv7cpu->regs[15] += 4;
+				}
+				armv7cpu->cpsr.t = (armv7cpu->regs[15] & 1);
+			}
+		}
+		wow_context->R0  = armv7cpu->regs[0];
+		wow_context->R1  = armv7cpu->regs[1];
+		wow_context->R2  = armv7cpu->regs[2];
+		wow_context->R3  = armv7cpu->regs[3];
+		wow_context->R4  = armv7cpu->regs[4];
+		wow_context->R5  = armv7cpu->regs[5];
+		wow_context->R6  = armv7cpu->regs[6];
+		wow_context->R7  = armv7cpu->regs[7];
+		wow_context->R8  = armv7cpu->regs[8];
+		wow_context->R9  = armv7cpu->regs[9];
+		wow_context->R10 = armv7cpu->regs[10];
+		wow_context->R11 = armv7cpu->regs[11];
+		wow_context->R12 = armv7cpu->regs[12];
+		wow_context->Sp  = armv7cpu->regs[13];
+		wow_context->Lr  = armv7cpu->regs[14];
+		wow_context->Pc  = armv7cpu->regs[15];
+		wow_context->Cpsr = armv7cpu->psr_to_value(&armv7cpu->cpsr);
+		UINT64 arm32pcaddr = armv7cpu->regs[15];
+		delete(armv7cpu);
+		delete(emumem);
+		delete(emudtimer);
+		delete(emuirq);
+		if (((arm32pcaddr) & 0xFFFFFFFE) == (((UINT32)&bopcode) & 0xFFFFFFFE)) {
+			wow_context->R0 = Wow64SystemServiceEx(wow_context->R12, (UINT*)ULongToPtr(wow_context->Sp));
+			wow_context->Pc = wow_context->Lr;
+			wow_context->Lr = wow_context->R3;
+			wow_context->Sp += (4 * 4);
+		}
+		else if (((arm32pcaddr) & 0xFFFFFFFE) == (((UINT32)&unixbopcode) & 0xFFFFFFFE)) {
+			wow_context->R0  = p__wine_unix_call(((UINT64)((((UINT64)wow_context->R0) << (32 * 0)) | (((UINT64)wow_context->R1) << (32 * 1)))), wow_context->R2, (UINT*)ULongToPtr(wow_context->R3));
+			wow_context->Pc = wow_context->Lr;
+		}
     }
 	__declspec(dllexport) void* WINAPI __wine_get_unix_opcode(void) { return (UINT32*)&unixbopcode; }
 	__declspec(dllexport) BOOLEAN WINAPI BTCpuIsProcessorFeaturePresent(UINT feature) { if (feature == 2 || feature == 3 || feature == 6 || feature == 7 || feature == 8 || feature == 10 || feature == 13 || feature == 17 || feature == 36 || feature == 37 || feature == 38) { return true; } return false; }
