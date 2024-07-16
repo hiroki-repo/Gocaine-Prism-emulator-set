@@ -264,7 +264,7 @@ if (CPU_INST_OP32){\
 GET_PCDWORD(op);\
 GEN_IMM(&instcache4gen, 0, (UINT64)(&CPU_EIP));\
 GEN_LDR_MEM(&instcache4gen, 1, 0, 2);\
-GEN_ADD_IMM8(&instcache4gen, 1, 1);\
+GEN_ADD_IMM8(&instcache4gen, 1, 5);\
 GEN_STR_MEM(&instcache4gen, 1, 0, 2);\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(&(CPU_EAX))));\
 	GEN_LDR_MEM(&instcache4gen, 0, 0, 2);\
@@ -277,7 +277,7 @@ GEN_STR_MEM(&instcache4gen, 1, 0, 2);\
 GET_PCWORD(op);\
 GEN_IMM(&instcache4gen, 0, (UINT64)(&CPU_EIP));\
 GEN_LDR_MEM(&instcache4gen, 1, 0, 2);\
-GEN_ADD_IMM8(&instcache4gen, 1, 1);\
+GEN_ADD_IMM8(&instcache4gen, 1, 3);\
 GEN_STR_MEM(&instcache4gen, 1, 0, 2);\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(&(CPU_AX))));\
 	GEN_LDR_MEM(&instcache4gen, 0, 0, 1);\
