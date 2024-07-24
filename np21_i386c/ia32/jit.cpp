@@ -34,6 +34,10 @@
 #include "instructions/sse/sse.h"
 #include "instructions/bin_arith.h"
 
+UINT64 CPU_EIP_VAK = 0;
+
+void __fastcall JIT_CPU_COUNT(UINT32 prm_0) { CPU_REMCLOCK -= (prm_0); return; }
+
 UINT32 __fastcall JIT_ADD_DWORD(UINT32 prm_0, UINT32 prm_1) { UINT32 prm_0x = prm_0; _ADD_DWORD(prm_0x, prm_0, prm_1); return prm_0x; }
 UINT16 __fastcall  JIT_ADD_WORD(UINT16 prm_0, UINT16 prm_1) { UINT16 prm_0x = prm_0; _ADD_WORD(prm_0x, prm_0, prm_1); return prm_0x; }
 UINT8  __fastcall  JIT_ADD_BYTE(UINT8  prm_0, UINT8  prm_1) { UINT8  prm_0x = prm_0; _ADD_BYTE(prm_0x, prm_0, prm_1); return prm_0x; }
@@ -77,26 +81,30 @@ GEN_LDR_MEM(&instcache4gen, 1, 0, 2);\
 GEN_ADD_IMM8(&instcache4gen, 1, 1);\
 GEN_STR_MEM(&instcache4gen, 1, 0, 2);\
 if ((op) >= 0xc0) {\
+	GEN_IMM(&instcache4gen,0,2);\
+	GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(JIT_CPU_COUNT))));\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(&(reg8_b20[op]))));\
 	GEN_LDR_MEM(&instcache4gen, 0, 0, 0);\
 	GEN_IMM(&instcache4gen, 1, ((UINT64)(&(reg8_b53[op]))));\
 	GEN_LDR_MEM(&instcache4gen, 1, 1, 0);\
-	GEN_CALL_ADDR(&instcache4gen, (UINT64)(& inst##_BYTE));\
+	GEN_CALL_ADDR(&instcache4gen, (UINT64)(& JIT_##inst##_BYTE));\
 	GEN_IMM(&instcache4gen, 1, ((UINT64)(&(reg8_b20[op]))));\
 	GEN_STR_MEM(&instcache4gen, 0, 1, 0);\
 }\
 else {\
+	GEN_IMM(&instcache4gen,0,7);\
+	GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(JIT_CPU_COUNT))));\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(op)));\
 	GEN_CALL_ADDR(&instcache4gen, (UINT64)(&calc_ea_dst));\
 	GEN_MOV(&instcache4gen, 1, 0);\
-	CPU_EIP_VAK=CPU_EIP\
-	calc_ea_dst(op)\
+	CPU_EIP_VAK=CPU_EIP;\
+	calc_ea_dst(op);\
 	GEN_IMM(&instcache4gen, 2, (UINT64)(&CPU_EIP));\
 	GEN_LDR_MEM(&instcache4gen, 3, 2, 2);\
 	GEN_ADD_IMM8(&instcache4gen, 1, (CPU_EIP-CPU_EIP_VAK));\
 	GEN_STR_MEM(&instcache4gen, 3, 2, 2);\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(CPU_INST_SEGREG_INDEX)));\
-	GEN_IMM(&instcache4gen, 2, ((UINT64)(& inst##_BYTE)));\
+	GEN_IMM(&instcache4gen, 2, ((UINT64)(& JIT_##inst##_BYTE)));\
 	GEN_IMM(&instcache4gen, 3, ((UINT64)(&(reg8_b53[op]))));\
 	GEN_LDR_MEM(&instcache4gen, 3, 3, 0);\
 	GEN_CALL_ADDR(&instcache4gen, (UINT64)(&cpu_vmemory_RMW_b));\
@@ -110,52 +118,60 @@ GEN_ADD_IMM8(&instcache4gen, 1, 1);\
 GEN_STR_MEM(&instcache4gen, 1, 0, 2);\
 if (CPU_INST_OP32){\
 if ((op) >= 0xc0) {\
+	GEN_IMM(&instcache4gen,0,2);\
+	GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(JIT_CPU_COUNT))));\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(&(reg32_b20[op]))));\
 	GEN_LDR_MEM(&instcache4gen, 0, 0, 2);\
 	GEN_IMM(&instcache4gen, 1, ((UINT64)(&(reg32_b53[op]))));\
 	GEN_LDR_MEM(&instcache4gen, 1, 1, 2);\
-	GEN_CALL_ADDR(&instcache4gen, (UINT64)(& inst##_DWORD));\
+	GEN_CALL_ADDR(&instcache4gen, (UINT64)(& JIT_##inst##_DWORD));\
 	GEN_IMM(&instcache4gen, 1, ((UINT64)(&(reg32_b20[op]))));\
 	GEN_STR_MEM(&instcache4gen, 0, 1, 2);\
 }\
 else {\
+	GEN_IMM(&instcache4gen,0,7);\
+	GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(JIT_CPU_COUNT))));\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(op)));\
 	GEN_CALL_ADDR(&instcache4gen, (UINT64)(&calc_ea_dst));\
 	GEN_MOV(&instcache4gen, 1, 0);\
-	CPU_EIP_VAK=CPU_EIP\
-	calc_ea_dst(op)\
+	CPU_EIP_VAK=CPU_EIP;\
+	calc_ea_dst(op);\
 	GEN_IMM(&instcache4gen, 2, (UINT64)(&CPU_EIP));\
 	GEN_LDR_MEM(&instcache4gen, 3, 2, 2);\
 	GEN_ADD_IMM8(&instcache4gen, 1, (CPU_EIP-CPU_EIP_VAK));\
 	GEN_STR_MEM(&instcache4gen, 3, 2, 2);\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(CPU_INST_SEGREG_INDEX)));\
-	GEN_IMM(&instcache4gen, 2, ((UINT64)(& inst##_DWORD)));\
+	GEN_IMM(&instcache4gen, 2, ((UINT64)(& JIT_##inst##_DWORD)));\
 	GEN_IMM(&instcache4gen, 3, ((UINT64)(&(reg32_b53[op]))));\
 	GEN_LDR_MEM(&instcache4gen, 3, 3, 2);\
 	GEN_CALL_ADDR(&instcache4gen, (UINT64)(&cpu_vmemory_RMW_d));\
 }\
 }else{\
 if ((op) >= 0xc0) {\
+	GEN_IMM(&instcache4gen,0,2);\
+	GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(JIT_CPU_COUNT))));\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(&(reg16_b20[op]))));\
 	GEN_LDR_MEM(&instcache4gen, 0, 0, 1);\
 	GEN_IMM(&instcache4gen, 1, ((UINT64)(&(reg16_b53[op]))));\
 	GEN_LDR_MEM(&instcache4gen, 1, 1, 1);\
-	GEN_CALL_ADDR(&instcache4gen, (UINT64)(& inst##_WORD));\
+	GEN_CALL_ADDR(&instcache4gen, (UINT64)(& JIT_##inst##_WORD));\
 	GEN_IMM(&instcache4gen, 1, ((UINT64)(&(reg16_b20[op]))));\
 	GEN_STR_MEM(&instcache4gen, 0, 1, 1);\
 }\
 else {\
+	GEN_IMM(&instcache4gen,0,7);\
+	GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(JIT_CPU_COUNT))));\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(op)));\
 	GEN_CALL_ADDR(&instcache4gen, (UINT64)(&calc_ea_dst));\
 	GEN_MOV(&instcache4gen, 1, 0);\
-	CPU_EIP_VAK=CPU_EIP\
-	calc_ea_dst(op)\
+	CPU_EIP_VAK=CPU_EIP;\
+	calc_ea_dst(op);\
 	GEN_IMM(&instcache4gen, 2, (UINT64)(&CPU_EIP));\
 	GEN_LDR_MEM(&instcache4gen, 3, 2, 2);\
 	GEN_ADD_IMM8(&instcache4gen, 1, (CPU_EIP-CPU_EIP_VAK));\
 	GEN_STR_MEM(&instcache4gen, 3, 2, 2);\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(CPU_INST_SEGREG_INDEX)));\
-	GEN_IMM(&instcache4gen, 2, ((UINT64)(& inst##_WORD)));\
+	GEN_IMM(&instcache4gen, 2, ((UINT64)(& JIT_##inst##_WORD)));\
 	GEN_IMM(&instcache4gen, 3, ((UINT64)(&(reg16_b53[op]))));\
 	GEN_LDR_MEM(&instcache4gen, 3, 3, 1);\
 	GEN_CALL_ADDR(&instcache4gen, (UINT64)(&cpu_vmemory_RMW_w));\
@@ -169,25 +185,29 @@ GEN_LDR_MEM(&instcache4gen, 1, 0, 2);\
 GEN_ADD_IMM8(&instcache4gen, 1, 1);\
 GEN_STR_MEM(&instcache4gen, 1, 0, 2);\
 if ((op) >= 0xc0) {\
+	GEN_IMM(&instcache4gen,0,2);\
+	GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(JIT_CPU_COUNT))));\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(&(reg8_b53[op]))));\
 	GEN_LDR_MEM(&instcache4gen, 0, 0, 0);\
 	GEN_IMM(&instcache4gen, 1, ((UINT64)(&(reg8_b20[op]))));\
 	GEN_LDR_MEM(&instcache4gen, 1, 1, 0);\
 }\
 else {\
+	GEN_IMM(&instcache4gen,0,7);\
+	GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(JIT_CPU_COUNT))));\
 	GEN_CALL_ADDR(&instcache4gen, (UINT64)(&calc_ea_dst));\
 	GEN_MOV(&instcache4gen, 1, 0);\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(CPU_INST_SEGREG_INDEX)));\
 	GEN_CALL_ADDR(&instcache4gen, (UINT64)(&cpu_vmemoryread_b));\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(op)));\
-	CPU_EIP_VAK=CPU_EIP\
-	calc_ea_dst(op)\
+	CPU_EIP_VAK=CPU_EIP;\
+	calc_ea_dst(op);\
 	GEN_IMM(&instcache4gen, 2, (UINT64)(&CPU_EIP));\
 	GEN_LDR_MEM(&instcache4gen, 3, 2, 2);\
 	GEN_ADD_IMM8(&instcache4gen, 1, (CPU_EIP-CPU_EIP_VAK));\
 	GEN_STR_MEM(&instcache4gen, 3, 2, 2);\
 }\
-	GEN_CALL_ADDR(&instcache4gen, (UINT64)(& inst##_BYTE));\
+	GEN_CALL_ADDR(&instcache4gen, (UINT64)(& JIT_##inst##_BYTE));\
 	GEN_IMM(&instcache4gen, 1, ((UINT64)(&(reg8_b53[op]))));\
 	GEN_STR_MEM(&instcache4gen, 0, 1, 0);\
 break;\
@@ -199,54 +219,64 @@ GEN_ADD_IMM8(&instcache4gen, 1, 1);\
 GEN_STR_MEM(&instcache4gen, 1, 0, 2);\
 if (CPU_INST_OP32){\
 if ((op) >= 0xc0) {\
+	GEN_IMM(&instcache4gen,0,2);\
+	GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(JIT_CPU_COUNT))));\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(&(reg32_b53[op]))));\
 	GEN_LDR_MEM(&instcache4gen, 0, 0, 2);\
 	GEN_IMM(&instcache4gen, 1, ((UINT64)(&(reg32_b20[op]))));\
 	GEN_LDR_MEM(&instcache4gen, 1, 1, 2);\
 }\
 else {\
+	GEN_IMM(&instcache4gen,0,7);\
+	GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(JIT_CPU_COUNT))));\
 	GEN_CALL_ADDR(&instcache4gen, (UINT64)(&calc_ea_dst));\
 	GEN_MOV(&instcache4gen, 1, 0);\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(CPU_INST_SEGREG_INDEX)));\
 	GEN_CALL_ADDR(&instcache4gen, (UINT64)(&cpu_vmemoryread_d));\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(op)));\
-	CPU_EIP_VAK=CPU_EIP\
-	calc_ea_dst(op)\
+	CPU_EIP_VAK=CPU_EIP;\
+	calc_ea_dst(op);\
 	GEN_IMM(&instcache4gen, 2, (UINT64)(&CPU_EIP));\
 	GEN_LDR_MEM(&instcache4gen, 3, 2, 2);\
 	GEN_ADD_IMM8(&instcache4gen, 1, (CPU_EIP-CPU_EIP_VAK));\
 	GEN_STR_MEM(&instcache4gen, 3, 2, 2);\
 }\
-	GEN_CALL_ADDR(&instcache4gen, (UINT64)(& inst##_DWORD));\
+	GEN_CALL_ADDR(&instcache4gen, (UINT64)(& JIT_##inst##_DWORD));\
 	GEN_IMM(&instcache4gen, 1, ((UINT64)(&(reg32_b53[op]))));\
 	GEN_STR_MEM(&instcache4gen, 0, 1, 2);\
 }else{\
 if ((op) >= 0xc0) {\
+	GEN_IMM(&instcache4gen,0,2);\
+	GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(JIT_CPU_COUNT))));\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(&(reg16_b53[op]))));\
 	GEN_LDR_MEM(&instcache4gen, 0, 0, 1);\
 	GEN_IMM(&instcache4gen, 1, ((UINT64)(&(reg16_b20[op]))));\
 	GEN_LDR_MEM(&instcache4gen, 1, 1, 1);\
 }\
 else {\
+	GEN_IMM(&instcache4gen,0,7);\
+	GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(JIT_CPU_COUNT))));\
 	GEN_CALL_ADDR(&instcache4gen, (UINT64)(&calc_ea_dst));\
 	GEN_MOV(&instcache4gen, 1, 0);\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(CPU_INST_SEGREG_INDEX)));\
 	GEN_CALL_ADDR(&instcache4gen, (UINT64)(&cpu_vmemoryread_w));\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(op)));\
-	CPU_EIP_VAK=CPU_EIP\
-	calc_ea_dst(op)\
+	CPU_EIP_VAK=CPU_EIP;\
+	calc_ea_dst(op);\
 	GEN_IMM(&instcache4gen, 2, (UINT64)(&CPU_EIP));\
 	GEN_LDR_MEM(&instcache4gen, 3, 2, 2);\
 	GEN_ADD_IMM8(&instcache4gen, 1, (CPU_EIP-CPU_EIP_VAK));\
 	GEN_STR_MEM(&instcache4gen, 3, 2, 2);\
 }\
-	GEN_CALL_ADDR(&instcache4gen, (UINT64)(& inst##_WORD));\
+	GEN_CALL_ADDR(&instcache4gen, (UINT64)(& JIT_##inst##_WORD));\
 	GEN_IMM(&instcache4gen, 1, ((UINT64)(&(reg16_b53[op]))));\
 	GEN_STR_MEM(&instcache4gen, 0, 1, 1);\
 }\
 break;\
 case instcode+4:\
 GET_PCBYTE(op);\
+GEN_IMM(&instcache4gen,0,2);\
+GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(JIT_CPU_COUNT))));\
 GEN_IMM(&instcache4gen, 0, (UINT64)(&CPU_EIP));\
 GEN_LDR_MEM(&instcache4gen, 1, 0, 2);\
 GEN_ADD_IMM8(&instcache4gen, 1, 1);\
@@ -255,11 +285,13 @@ GEN_STR_MEM(&instcache4gen, 1, 0, 2);\
 	GEN_LDR_MEM(&instcache4gen, 0, 0, 0);\
 	GEN_IMM(&instcache4gen, 1, ((UINT64)(op)));\
 	GEN_LDR_MEM(&instcache4gen, 1, 1, 0);\
-	GEN_CALL_ADDR(&instcache4gen, (UINT64)(& inst##_BYTE));\
+	GEN_CALL_ADDR(&instcache4gen, (UINT64)(& JIT_##inst##_BYTE));\
 	GEN_IMM(&instcache4gen, 1, ((UINT64)(&(CPU_AL))));\
 	GEN_STR_MEM(&instcache4gen, 0, 1, 0);\
 break;\
 case instcode+5:\
+GEN_IMM(&instcache4gen,0,2);\
+GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(JIT_CPU_COUNT))));\
 if (CPU_INST_OP32){\
 GET_PCDWORD(op);\
 GEN_IMM(&instcache4gen, 0, (UINT64)(&CPU_EIP));\
@@ -270,7 +302,7 @@ GEN_STR_MEM(&instcache4gen, 1, 0, 2);\
 	GEN_LDR_MEM(&instcache4gen, 0, 0, 2);\
 	GEN_IMM(&instcache4gen, 1, ((UINT64)(op)));\
 	GEN_LDR_MEM(&instcache4gen, 1, 1, 2);\
-	GEN_CALL_ADDR(&instcache4gen, (UINT64)(& inst##_DWORD));\
+	GEN_CALL_ADDR(&instcache4gen, (UINT64)(& JIT_##inst##_DWORD));\
 	GEN_IMM(&instcache4gen, 1, ((UINT64)(&(CPU_EAX))));\
 	GEN_STR_MEM(&instcache4gen, 0, 1, 2);\
 }else{\
@@ -283,7 +315,7 @@ GEN_STR_MEM(&instcache4gen, 1, 0, 2);\
 	GEN_LDR_MEM(&instcache4gen, 0, 0, 1);\
 	GEN_IMM(&instcache4gen, 1, ((UINT64)(op)));\
 	GEN_LDR_MEM(&instcache4gen, 1, 1, 1);\
-	GEN_CALL_ADDR(&instcache4gen, (UINT64)(& inst##_WORD));\
+	GEN_CALL_ADDR(&instcache4gen, (UINT64)(& JIT_##inst##_WORD));\
 	GEN_IMM(&instcache4gen, 1, ((UINT64)(&(CPU_AX))));\
 	GEN_STR_MEM(&instcache4gen, 0, 1, 1);\
 }\
@@ -695,6 +727,11 @@ UINT64 __fastcall getptrforexec() {
 	}
 }
 
+void __fastcall repgenx_16(UINT32 op) {
+	CPU_WORKCLOCK(5);
+		(*insttable_1byte[CPU_INST_OP32][op])();
+		--CPU_CX;
+}
 void __fastcall rep_16(UINT32 op) {
 	CPU_WORKCLOCK(5);
 	for (;;) {
@@ -723,7 +760,13 @@ void __fastcall repne_16(UINT32 op) {
 	}
 }
 
+void __fastcall repgenx_32(UINT32 op) {
+	CPU_WORKCLOCK(5);
+	(*insttable_1byte[CPU_INST_OP32][op])();
+	--CPU_ECX;
+}
 void __fastcall rep_32(UINT32 op) {
+	CPU_WORKCLOCK(5);
 	for (;;) {
 		(*insttable_1byte[CPU_INST_OP32][op])();
 		if (--CPU_ECX == 0) {
@@ -732,6 +775,7 @@ void __fastcall rep_32(UINT32 op) {
 	}
 }
 void __fastcall repe_32(UINT32 op) {
+	CPU_WORKCLOCK(5);
 	for (;;) {
 		(*insttable_1byte[CPU_INST_OP32][op])();
 		if (--CPU_ECX == 0 || CC_NZ) {
@@ -740,6 +784,7 @@ void __fastcall repe_32(UINT32 op) {
 	}
 }
 void __fastcall repne_32(UINT32 op) {
+	CPU_WORKCLOCK(5);
 	for (;;) {
 		(*insttable_1byte[CPU_INST_OP32][op])();
 		if (--CPU_ECX == 0 || CC_Z) {
@@ -786,10 +831,10 @@ UINT64 exec_jit() {
 	do {
 		cpueipbak = CPU_EIP;
 		CPU_EIP &= 0xFFFFF000;
-		for (int cnt = (cpueipbak & 0xFFF); cnt < 4097;cnt++) {
+		for (int cnt = (cpueipbak & 0xFFF); cnt < 4097; cnt++) {
 			if (cnt == 4096) { jitcache[CPU_PREV_EIP & 0xFFF].codeinfo.ci.codetermination = 1; break; }
 			jitcache[cnt].codeinfo.ci.codetermination = 0;
-fetchopc:
+		fetchopc:
 			CPU_PREV_EIP = CPU_EIP;
 			CPU_STATSAVE.cpu_inst = CPU_STATSAVE.cpu_inst_default;
 			for (prefix = 0; prefix < MAX_PREFIX; prefix++) {
@@ -838,7 +883,7 @@ fetchopc:
 					else
 #endif
 					{
-						jitcache[cnt].codeptr = * insttable_2byte[0][op];
+						jitcache[cnt].codeptr = *insttable_2byte[0][op];
 					}
 				}
 				else {
@@ -858,10 +903,10 @@ fetchopc:
 					else
 #endif
 					{
-						jitcache[cnt].codeptr = * insttable_2byte[1][op];
+						jitcache[cnt].codeptr = *insttable_2byte[1][op];
 					}
 				}
-jitnext:
+			jitnext:
 				if (cnt == 4095) { jitcache[CPU_PREV_EIP & 0xFFF].codeinfo.ci.codetermination = 1; break; }
 				CPU_EIP--; goto fetchopc;
 			}
@@ -934,7 +979,7 @@ jitnext:
 		CPU_PREV_EIP = CPU_EIP;
 		CPU_STATSAVE.cpu_inst = CPU_STATSAVE.cpu_inst_default;
 		do {
-			if (jitcache[CPU_EIP&0xFFF].codeinfo.ci.prefixcontinuous){
+			if (jitcache[CPU_EIP & 0xFFF].codeinfo.ci.prefixcontinuous) {
 				CPU_PREV_EIP = CPU_EIP;
 				CPU_STATSAVE.cpu_inst = CPU_STATSAVE.cpu_inst_default;
 				if (jitcache[CPU_EIP & 0xFFF].codeinfo.ci.codetermination) { break; }
@@ -1118,11 +1163,295 @@ jitnext:
 #endif
 #else
 	UINT64 addrtoexec;
+	UINT64 cpueipbak;
 
 	int prefix;
 	UINT32 op;
-	UINT64 cpueipbak;
-	
+	void (*func)(void);
+	UINT32 transcoderem = (4096 - (CPU_EIP & 0xFFF));
+
+	if (instcache4gen == 0) {
+		instcache4gen = (UINT8*)VirtualAlloc(0, 4096 * 1024, 0x3000, 0x40);
+	}
+	do {
+		instcache4genold = instcache4gen;
+		cpueipbak = CPU_EIP;
+
+		do {
+
+			CPU_PREV_EIP = CPU_EIP;
+			CPU_STATSAVE.cpu_inst = CPU_STATSAVE.cpu_inst_default;
+
+			for (prefix = 0; prefix < MAX_PREFIX; prefix++) {
+				GET_PCBYTE(op);
+
+				/* prefix */
+				if (insttable_info[op] & INST_PREFIX) {
+					(*insttable_1byte[0][op])();
+					continue;
+				}
+				break;
+			}
+			GEN_IMM(&instcache4gen, 0, (UINT64)(&CPU_EIP));
+			GEN_IMM(&instcache4gen, 1, (UINT64)(&CPU_PREV_EIP));
+			GEN_LDR_MEM(&instcache4gen, 0, 0, 2);
+			GEN_STR_MEM(&instcache4gen, 0, 1, 2);
+			GEN_IMM(&instcache4gen, 0, *(UINT64*)(&CPU_STATSAVE.cpu_inst));
+			GEN_IMM(&instcache4gen, 1, (UINT64)(&CPU_STATSAVE.cpu_inst));
+			GEN_STR_MEM(&instcache4gen, 0, 1, 3);
+			if (prefix == MAX_PREFIX) {
+				//EXCEPTION(UD_EXCEPTION, 0);
+				GEN_IMM(&instcache4gen, 0, (UINT64)(UD_EXCEPTION));
+				GEN_IMM(&instcache4gen, 1, (UINT64)(0));
+				GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(exception))));
+				GEN_RET(&instcache4gen);
+			}
+			else {
+				GEN_IMM(&instcache4gen, 0, (UINT64)(&CPU_EIP));
+				GEN_LDR_MEM(&instcache4gen, 1, 0, 2);
+				GEN_ADD_IMM8(&instcache4gen, 1, prefix);
+				GEN_STR_MEM(&instcache4gen, 1, 0, 2);
+			}
+
+			/* normal / rep, but not use */
+			if (!(insttable_info[op] & INST_STRING) || !CPU_INST_REPUSE) {
+				//(*insttable_1byte[CPU_INST_OP32][op])();
+				switch (op) {
+						genarithcode(ADD, 0x00)
+						genarithcode(OR, 0x08)
+				case 0x0f:
+					GET_PCBYTE(op);
+					GEN_IMM(&instcache4gen, 0, (UINT64)(&CPU_EIP));
+					GEN_LDR_MEM(&instcache4gen, 1, 0, 2);
+					GEN_ADD_IMM8(&instcache4gen, 1, 1);
+					GEN_STR_MEM(&instcache4gen, 1, 0, 2);
+					if (insttable_2byte660F_32[op] && CPU_INST_OP32 == !CPU_STATSAVE.cpu_inst_default.op_32) {
+						GEN_IMM(&instcache4gen, 0, *(UINT32*)(&CPU_PREV_EIP));
+						GEN_IMM(&instcache4gen, 1, (UINT64)(&CPU_EIP));
+						GEN_STR_MEM(&instcache4gen, 0, 1, 2);
+						GEN_RET(&instcache4gen);
+					}
+					else if (insttable_2byteF20F_32[op] && CPU_INST_REPUSE == 0xf2) {
+						GEN_IMM(&instcache4gen, 0, *(UINT32*)(&CPU_PREV_EIP));
+						GEN_IMM(&instcache4gen, 1, (UINT64)(&CPU_EIP));
+						GEN_STR_MEM(&instcache4gen, 0, 1, 2);
+						GEN_RET(&instcache4gen);
+					}
+					else if (insttable_2byteF30F_32[op] && CPU_INST_REPUSE == 0xf3) {
+						GEN_IMM(&instcache4gen, 0, *(UINT32*)(&CPU_PREV_EIP));
+						GEN_IMM(&instcache4gen, 1, (UINT64)(&CPU_EIP));
+						GEN_STR_MEM(&instcache4gen, 0, 1, 2);
+						GEN_RET(&instcache4gen);
+					}
+					else {
+						switch (op) {
+						case 0x30:
+						case 0x31:
+						case 0x32:
+						case 0xa0:
+						case 0xa1:
+						case 0xa2:
+						case 0xa8:
+						case 0xa9:
+							GEN_CALL_ADDR(&instcache4gen, ((UINT64)(insttable_2byte[CPU_INST_OP32][op])));
+							break;
+						default:
+							GEN_IMM(&instcache4gen, 0, *(UINT32*)(&CPU_PREV_EIP));
+							GEN_IMM(&instcache4gen, 1, (UINT64)(&CPU_EIP));
+							GEN_STR_MEM(&instcache4gen, 0, 1, 2);
+							GEN_RET(&instcache4gen);
+						}
+					}
+					break;
+						genarithcode(ADC, 0x10)
+						genarithcode(SBB, 0x18)
+						genarithcode(AND, 0x20)
+						genarithcode(SUB, 0x28)
+						genarithcode(XOR, 0x30)
+						genarithcode(CMP, 0x38)
+				case 0x06:
+				case 0x07:
+				case 0x0e:
+				case 0x16:
+				case 0x17:
+				case 0x1e:
+				case 0x1f:
+				case 0x27:
+				case 0x2f:
+				case 0x37:
+				case 0x3f:
+				case 0x40:
+				case 0x41:
+				case 0x42:
+				case 0x43:
+				case 0x44:
+				case 0x45:
+				case 0x46:
+				case 0x47:
+				case 0x48:
+				case 0x49:
+				case 0x4a:
+				case 0x4b:
+				case 0x4c:
+				case 0x4d:
+				case 0x4e:
+				case 0x4f:
+				case 0x50:
+				case 0x51:
+				case 0x52:
+				case 0x53:
+				case 0x54:
+				case 0x55:
+				case 0x56:
+				case 0x57:
+				case 0x58:
+				case 0x59:
+				case 0x5a:
+				case 0x5b:
+				case 0x5c:
+				case 0x5d:
+				case 0x5e:
+				case 0x5f:
+				case 0x60:
+				case 0x61:
+				case 0x62:
+				case 0x63:
+				case 0x90:
+				case 0x91:
+				case 0x92:
+				case 0x93:
+				case 0x94:
+				case 0x95:
+				case 0x96:
+				case 0x97:
+				case 0x98:
+				case 0x99:
+				case 0x9c:
+				case 0x9d:
+				case 0x9e:
+				case 0x9f:
+				case 0xec:
+				case 0xed:
+				case 0xee:
+				case 0xef:
+				case 0xf5:
+				case 0xf8:
+				case 0xf9:
+				case 0xfa:
+				case 0xfb:
+				case 0xfc:
+				case 0xfd:
+					GEN_CALL_ADDR(&instcache4gen, ((UINT64)(insttable_1byte[CPU_INST_OP32][op])));
+					break;
+				default:
+					GEN_IMM(&instcache4gen, 0, *(UINT32*)(&CPU_PREV_EIP));
+					GEN_IMM(&instcache4gen, 1, (UINT64)(&CPU_EIP));
+					GEN_STR_MEM(&instcache4gen, 0, 1, 2);
+					GEN_RET(&instcache4gen);
+				}
+				goto cpucontinue; //continue;
+			}
+
+			/* rep */
+			CPU_WORKCLOCK(5);
+			func = insttable_1byte[CPU_INST_OP32][op];
+			if (!CPU_INST_AS32) {
+				if (CPU_CX != 0) {
+					if (CPU_CX == 1) {
+						GEN_IMM(&instcache4gen, 0, (UINT64)(op));
+						GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(repgenx_16))));
+					}
+					else {
+						if (!(insttable_info[op] & REP_CHECKZF)) {
+							if (insttable_1byte_repfunc[CPU_INST_OP32][op]) {
+								GEN_IMM(&instcache4gen, 0, (UINT64)(0));
+								GEN_CALL_ADDR(&instcache4gen, ((UINT64)(insttable_1byte_repfunc[CPU_INST_OP32][op])));
+							}
+							else {
+								/* rep */
+								GEN_IMM(&instcache4gen, 0, (UINT64)(op));
+								GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(rep_16))));
+							}
+						}
+						else if (CPU_INST_REPUSE != 0xf2) {
+							if (insttable_1byte_repfunc[CPU_INST_OP32][op]) {
+								GEN_IMM(&instcache4gen, 0, (UINT64)(1));
+								GEN_CALL_ADDR(&instcache4gen, ((UINT64)(insttable_1byte_repfunc[CPU_INST_OP32][op])));
+							}
+							else {
+								/* repe */
+								GEN_IMM(&instcache4gen, 0, (UINT64)(op));
+								GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(repe_16))));
+							}
+						}
+						else {
+							if (insttable_1byte_repfunc[CPU_INST_OP32][op]) {
+								GEN_IMM(&instcache4gen, 0, (UINT64)(2));
+								GEN_CALL_ADDR(&instcache4gen, ((UINT64)(insttable_1byte_repfunc[CPU_INST_OP32][op])));
+							}
+							else {
+								/* repne */
+								GEN_IMM(&instcache4gen, 0, (UINT64)(op));
+								GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(repne_16))));
+							}
+						}
+					}
+				}
+			}
+			else {
+				if (CPU_ECX != 0) {
+					if (CPU_ECX == 1) {
+						GEN_IMM(&instcache4gen, 0, (UINT64)(op));
+						GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(repgenx_32))));
+					}
+					else {
+						if (!(insttable_info[op] & REP_CHECKZF)) {
+							if (insttable_1byte_repfunc[CPU_INST_OP32][op]) {
+								GEN_IMM(&instcache4gen, 0, (UINT64)(0));
+								GEN_CALL_ADDR(&instcache4gen, ((UINT64)(insttable_1byte_repfunc[CPU_INST_OP32][op])));
+							}
+							else {
+								/* rep */
+								GEN_IMM(&instcache4gen, 0, (UINT64)(op));
+								GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(rep_32))));
+							}
+						}
+						else if (CPU_INST_REPUSE != 0xf2) {
+							if (insttable_1byte_repfunc[CPU_INST_OP32][op]) {
+								GEN_IMM(&instcache4gen, 0, (UINT64)(1));
+								GEN_CALL_ADDR(&instcache4gen, ((UINT64)(insttable_1byte_repfunc[CPU_INST_OP32][op])));
+							}
+							else {
+								/* repe */
+								GEN_IMM(&instcache4gen, 0, (UINT64)(op));
+								GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(repe_32))));
+							}
+						}
+						else {
+							if (insttable_1byte_repfunc[CPU_INST_OP32][op]) {
+								GEN_IMM(&instcache4gen, 0, (UINT64)(2));
+								GEN_CALL_ADDR(&instcache4gen, ((UINT64)(insttable_1byte_repfunc[CPU_INST_OP32][op])));
+							}
+							else {
+								/* repne */
+								GEN_IMM(&instcache4gen, 0, (UINT64)(op));
+								GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(repne_32))));
+							}
+						}
+					}
+				}
+			}
+			GEN_RET(&instcache4gen);
+		cpucontinue:;
+
+		} while ((transcoderem--) != 0);
+		GEN_RET(&instcache4gen);
+		instcache4gen = instcache4genold;
+		CPU_EIP = cpueipbak;
+		FlushInstructionCache(GetCurrentProcess(), instcache4genold, 4096 * 1024);
+		((void (*)())(instcache4gen))();
+		exec_1step();
+	}while (CPU_REMCLOCK > 0);
 #endif
 	return CPU_REMCLOCK;
 }
