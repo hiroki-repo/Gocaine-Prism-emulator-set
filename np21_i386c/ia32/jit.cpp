@@ -99,10 +99,6 @@ else {\
 	GEN_MOV(&instcache4gen, 1, 0);\
 	CPU_EIP_VAK=CPU_EIP;\
 	calc_ea_dst(op);\
-	GEN_IMM(&instcache4gen, 2, (UINT64)(&CPU_EIP));\
-	GEN_LDR_MEM(&instcache4gen, 3, 2, 2);\
-	GEN_ADD_IMM8(&instcache4gen, 1, (CPU_EIP-CPU_EIP_VAK));\
-	GEN_STR_MEM(&instcache4gen, 3, 2, 2);\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(CPU_INST_SEGREG_INDEX)));\
 	GEN_IMM(&instcache4gen, 2, ((UINT64)(& JIT_##inst##_BYTE)));\
 	GEN_IMM(&instcache4gen, 3, ((UINT64)(&(reg8_b53[op]))));\
@@ -136,10 +132,6 @@ else {\
 	GEN_MOV(&instcache4gen, 1, 0);\
 	CPU_EIP_VAK=CPU_EIP;\
 	calc_ea_dst(op);\
-	GEN_IMM(&instcache4gen, 2, (UINT64)(&CPU_EIP));\
-	GEN_LDR_MEM(&instcache4gen, 3, 2, 2);\
-	GEN_ADD_IMM8(&instcache4gen, 1, (CPU_EIP-CPU_EIP_VAK));\
-	GEN_STR_MEM(&instcache4gen, 3, 2, 2);\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(CPU_INST_SEGREG_INDEX)));\
 	GEN_IMM(&instcache4gen, 2, ((UINT64)(& JIT_##inst##_DWORD)));\
 	GEN_IMM(&instcache4gen, 3, ((UINT64)(&(reg32_b53[op]))));\
@@ -166,10 +158,6 @@ else {\
 	GEN_MOV(&instcache4gen, 1, 0);\
 	CPU_EIP_VAK=CPU_EIP;\
 	calc_ea_dst(op);\
-	GEN_IMM(&instcache4gen, 2, (UINT64)(&CPU_EIP));\
-	GEN_LDR_MEM(&instcache4gen, 3, 2, 2);\
-	GEN_ADD_IMM8(&instcache4gen, 1, (CPU_EIP-CPU_EIP_VAK));\
-	GEN_STR_MEM(&instcache4gen, 3, 2, 2);\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(CPU_INST_SEGREG_INDEX)));\
 	GEN_IMM(&instcache4gen, 2, ((UINT64)(& JIT_##inst##_WORD)));\
 	GEN_IMM(&instcache4gen, 3, ((UINT64)(&(reg16_b53[op]))));\
@@ -202,10 +190,6 @@ else {\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(op)));\
 	CPU_EIP_VAK=CPU_EIP;\
 	calc_ea_dst(op);\
-	GEN_IMM(&instcache4gen, 2, (UINT64)(&CPU_EIP));\
-	GEN_LDR_MEM(&instcache4gen, 3, 2, 2);\
-	GEN_ADD_IMM8(&instcache4gen, 1, (CPU_EIP-CPU_EIP_VAK));\
-	GEN_STR_MEM(&instcache4gen, 3, 2, 2);\
 }\
 	GEN_CALL_ADDR(&instcache4gen, (UINT64)(& JIT_##inst##_BYTE));\
 	GEN_IMM(&instcache4gen, 1, ((UINT64)(&(reg8_b53[op]))));\
@@ -236,10 +220,6 @@ else {\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(op)));\
 	CPU_EIP_VAK=CPU_EIP;\
 	calc_ea_dst(op);\
-	GEN_IMM(&instcache4gen, 2, (UINT64)(&CPU_EIP));\
-	GEN_LDR_MEM(&instcache4gen, 3, 2, 2);\
-	GEN_ADD_IMM8(&instcache4gen, 1, (CPU_EIP-CPU_EIP_VAK));\
-	GEN_STR_MEM(&instcache4gen, 3, 2, 2);\
 }\
 	GEN_CALL_ADDR(&instcache4gen, (UINT64)(& JIT_##inst##_DWORD));\
 	GEN_IMM(&instcache4gen, 1, ((UINT64)(&(reg32_b53[op]))));\
@@ -263,10 +243,6 @@ else {\
 	GEN_IMM(&instcache4gen, 0, ((UINT64)(op)));\
 	CPU_EIP_VAK=CPU_EIP;\
 	calc_ea_dst(op);\
-	GEN_IMM(&instcache4gen, 2, (UINT64)(&CPU_EIP));\
-	GEN_LDR_MEM(&instcache4gen, 3, 2, 2);\
-	GEN_ADD_IMM8(&instcache4gen, 1, (CPU_EIP-CPU_EIP_VAK));\
-	GEN_STR_MEM(&instcache4gen, 3, 2, 2);\
 }\
 	GEN_CALL_ADDR(&instcache4gen, (UINT64)(& JIT_##inst##_WORD));\
 	GEN_IMM(&instcache4gen, 1, ((UINT64)(&(reg16_b53[op]))));\
@@ -672,6 +648,36 @@ void GEN_ADD_IMM8(void* codetmp, UINT8 regid, UINT8 imm8) {
 #endif
 }
 
+void GEN_NE_RET(void* codetmp, UINT8 regid, UINT8 regid2, bool sizeofinst) {
+#ifdef _M_ARM64
+	* (UINT32*)(*(UINT64*)(codetmp)) = (0x6b000000 | ((regid2 & 0x1f) << 16) | ((regid & 0x1f) << 0) | ((sizeofinst ? 1 : 0) << 31));
+	*(UINT64*)(codetmp) += 4;
+	*(UINT32*)(*(UINT64*)(codetmp)) = 0x54000040;
+	*(UINT64*)(codetmp) += 4;
+	GEN_RET(codetmp);
+#endif
+}
+
+void GEN_EQ_RET(void* codetmp, UINT8 regid, UINT8 regid2, bool sizeofinst) {
+#ifdef _M_ARM64
+	* (UINT32*)(*(UINT64*)(codetmp)) = (0x6b000000 | ((regid2 & 0x1f) << 16) | ((regid & 0x1f) << 0) | ((sizeofinst ? 1 : 0) << 31));
+	*(UINT64*)(codetmp) += 4;
+	*(UINT32*)(*(UINT64*)(codetmp)) = 0x54000041;
+	*(UINT64*)(codetmp) += 4;
+	GEN_RET(codetmp);
+#endif
+}
+
+void GEN_CC_RET(void* codetmp, UINT8 regid, UINT8 regid2, bool sizeofinst, UINT8 cond) {
+#ifdef _M_ARM64
+	* (UINT32*)(*(UINT64*)(codetmp)) = (0x6b000000 | ((regid2 & 0x1f) << 16) | ((regid & 0x1f) << 0) | ((sizeofinst ? 1 : 0) << 31));
+	*(UINT64*)(codetmp) += 4;
+	*(UINT32*)(*(UINT64*)(codetmp)) = (0x54000040 | ((cond & 0xF) << 0));
+	*(UINT64*)(codetmp) += 4;
+	GEN_RET(codetmp);
+#endif
+}
+
 void __fastcall addeip_addr(UINT32 prm_0) {
 	CPU_EIP += prm_0;
 	return;
@@ -791,6 +797,191 @@ void __fastcall repne_32(UINT32 op) {
 			break;
 		}
 	}
+}
+
+UINT64 exec_allstepfast() {
+	int prefix;
+	UINT32 op;
+
+	do {
+
+		CPU_PREV_EIP = CPU_EIP;
+		CPU_STATSAVE.cpu_inst = CPU_STATSAVE.cpu_inst_default;
+
+		for (prefix = 0; prefix < MAX_PREFIX; prefix++) {
+			GET_PCBYTE(op);
+
+			/* prefix */
+			if (insttable_info[op] & INST_PREFIX) {
+				(*insttable_1byte[0][op])();
+				continue;
+			}
+			break;
+		}
+		if (prefix == MAX_PREFIX) {
+			EXCEPTION(UD_EXCEPTION, 0);
+		}
+
+		/* normal / rep, but not use */
+		if (!(insttable_info[op] & INST_STRING) || !CPU_INST_REPUSE) {
+			(*insttable_1byte[CPU_INST_OP32][op])();
+			goto cpucontinue;
+		}
+
+		/* rep */
+		CPU_WORKCLOCK(5);
+		if (!CPU_INST_AS32) {
+			if (CPU_CX != 0) {
+				if (!(insttable_info[op] & REP_CHECKZF)) {
+					/* rep */
+					if (insttable_1byte_repfunc[CPU_INST_OP32][op]) {
+						(*insttable_1byte_repfunc[CPU_INST_OP32][op])(0);
+					}
+					else {
+						for (;;) {
+							(*insttable_1byte[CPU_INST_OP32][op])();
+							if (--CPU_CX == 0) {
+								break;
+							}
+							if (CPU_REMCLOCK <= 0) {
+								CPU_EIP = CPU_PREV_EIP;
+								break;
+							}
+						}
+					}
+				}
+				else if (CPU_INST_REPUSE != 0xf2) {
+					/* repe */
+					if (insttable_1byte_repfunc[CPU_INST_OP32][op]) {
+						(*insttable_1byte_repfunc[CPU_INST_OP32][op])(1);
+					}
+					else {
+						for (;;) {
+							(*insttable_1byte[CPU_INST_OP32][op])();
+							if (--CPU_CX == 0 || CC_NZ) {
+								break;
+							}
+							if (CPU_REMCLOCK <= 0) {
+								CPU_EIP = CPU_PREV_EIP;
+								break;
+							}
+						}
+					}
+				}
+				else {
+					/* repne */
+					if (insttable_1byte_repfunc[CPU_INST_OP32][op]) {
+						(*insttable_1byte_repfunc[CPU_INST_OP32][op])(2);
+					}
+					else {
+						for (;;) {
+							(*insttable_1byte[CPU_INST_OP32][op])();
+							if (--CPU_CX == 0 || CC_Z) {
+								break;
+							}
+							if (CPU_REMCLOCK <= 0) {
+								CPU_EIP = CPU_PREV_EIP;
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
+		else {
+			if (CPU_ECX != 0) {
+				if (!(insttable_info[op] & REP_CHECKZF)) {
+					/* rep */
+					if (insttable_1byte_repfunc[CPU_INST_OP32][op]) {
+						(*insttable_1byte_repfunc[CPU_INST_OP32][op])(0);
+					}
+					else {
+						for (;;) {
+							(*insttable_1byte[CPU_INST_OP32][op])();
+							if (--CPU_ECX == 0) {
+								break;
+							}
+							if (CPU_REMCLOCK <= 0) {
+								CPU_EIP = CPU_PREV_EIP;
+								break;
+							}
+						}
+					}
+				}
+				else if (CPU_INST_REPUSE != 0xf2) {
+					/* repe */
+					if (insttable_1byte_repfunc[CPU_INST_OP32][op]) {
+						(*insttable_1byte_repfunc[CPU_INST_OP32][op])(1);
+					}
+					else {
+						for (;;) {
+							(*insttable_1byte[CPU_INST_OP32][op])();
+							if (--CPU_ECX == 0 || CC_NZ) {
+								break;
+							}
+							if (CPU_REMCLOCK <= 0) {
+								CPU_EIP = CPU_PREV_EIP;
+								break;
+							}
+						}
+					}
+				}
+				else {
+					/* repne */
+					if (insttable_1byte_repfunc[CPU_INST_OP32][op]) {
+						(*insttable_1byte_repfunc[CPU_INST_OP32][op])(2);
+					}
+					else {
+						for (;;) {
+							(*insttable_1byte[CPU_INST_OP32][op])();
+							if (--CPU_ECX == 0 || CC_Z) {
+								break;
+							}
+							if (CPU_REMCLOCK <= 0) {
+								CPU_EIP = CPU_PREV_EIP;
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
+	cpucontinue:;
+	} while (CPU_REMCLOCK > 0);
+	return CPU_REMCLOCK;
+}
+
+UINT64 exec_1stepfast() {
+	exec_1step();
+	return CPU_REMCLOCK;
+}
+
+void* getopcodeptr() {
+	int prefix;
+	UINT32 op;
+
+	CPU_PREV_EIP = CPU_EIP;
+	CPU_STATSAVE.cpu_inst = CPU_STATSAVE.cpu_inst_default;
+	for (prefix = 0; prefix < MAX_PREFIX; prefix++) {
+		GET_PCBYTE(op);
+		/* prefix */
+		if (insttable_info[op] & INST_PREFIX) {
+			(*insttable_1byte[0][op])();
+			continue;
+		}
+		break;
+	}
+	if (prefix == MAX_PREFIX) {
+		EXCEPTION(UD_EXCEPTION, 0);
+	}
+	/* normal / rep, but not use */
+	if (!(insttable_info[op] & INST_STRING) || !CPU_INST_REPUSE) {
+		//(*insttable_1byte[CPU_INST_OP32][op])();
+		return (void*)(insttable_1byte[CPU_INST_OP32][op]);
+	}
+	CPU_EIP = CPU_PREV_EIP;
+	CPU_STATSAVE.cpu_inst = CPU_STATSAVE.cpu_inst_default;
+	return (void*)(&exec_1step);
 }
 
 bool writeddebugfile = false;
@@ -1176,8 +1367,10 @@ UINT64 exec_jit() {
 	do {
 		instcache4genold = instcache4gen;
 		cpueipbak = CPU_EIP;
+#if 1
 
 		do {
+#if 1
 
 			CPU_PREV_EIP = CPU_EIP;
 			CPU_STATSAVE.cpu_inst = CPU_STATSAVE.cpu_inst_default;
@@ -1209,7 +1402,7 @@ UINT64 exec_jit() {
 			else {
 				GEN_IMM(&instcache4gen, 0, (UINT64)(&CPU_EIP));
 				GEN_LDR_MEM(&instcache4gen, 1, 0, 2);
-				GEN_ADD_IMM8(&instcache4gen, 1, prefix);
+				GEN_ADD_IMM8(&instcache4gen, 1, (prefix + 1));
 				GEN_STR_MEM(&instcache4gen, 1, 0, 2);
 			}
 
@@ -1441,16 +1634,33 @@ UINT64 exec_jit() {
 					}
 				}
 			}
-			GEN_RET(&instcache4gen);
 		cpucontinue:;
-
+			GEN_IMM(&instcache4gen, 0, (UINT64)(&CPU_EIP));
+			GEN_LDR_MEM(&instcache4gen, 0, 0, 2);
+			GEN_IMM(&instcache4gen, 1, (UINT64)(CPU_EIP));
+			GEN_NE_RET(&instcache4gen, 0, 1, 0);
+			GEN_IMM(&instcache4gen, 0, (UINT64)(&CPU_REMCLOCK));
+			GEN_LDR_MEM(&instcache4gen, 0, 0, 2);
+			GEN_CC_RET(&instcache4gen, 0, 31, 0, 12);
+#else
+			GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(exec_1step))));
+			GEN_IMM(&instcache4gen, 0, (UINT64)(&CPU_REMCLOCK));
+			GEN_LDR_MEM(&instcache4gen, 0, 0, 2);
+			GEN_IMM(&instcache4gen, 1, (UINT64)(0));
+			GEN_CC_RET(&instcache4gen, 0, 1, 0, 8);
+			GEN_JMP_ADDR(&instcache4gen, ((UINT64)(instcache4genold)));
+#endif
 		} while ((transcoderem--) != 0);
+#endif
+		/*GEN_CALL_ADDR(&instcache4gen, ((UINT64)(&(exec_allstepfast))));
+		GEN_CC_RET(&instcache4gen, 0, 31, 0, 8);
+		GEN_JMP_ADDR(&instcache4gen, ((UINT64)(instcache4genold)));/**/
 		GEN_RET(&instcache4gen);
 		instcache4gen = instcache4genold;
 		CPU_EIP = cpueipbak;
 		FlushInstructionCache(GetCurrentProcess(), instcache4genold, 4096 * 1024);
 		((void (*)())(instcache4gen))();
-		exec_1step();
+		if (CPU_REMCLOCK > 0) { exec_1step(); }
 	}while (CPU_REMCLOCK > 0);
 #endif
 	return CPU_REMCLOCK;
