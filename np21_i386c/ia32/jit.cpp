@@ -461,14 +461,14 @@ void GEN_JMP_ADDR(void* codetmp, UINT64 imm64) {
 	*(UINT32*)(codetmp) += 2;
 #else
 #ifdef _M_AMD64
-	* (UINT8*)(*(UINT64*)(codetmp)) = 0x48 | (((regid >> 3) & 1) << 2); *(UINT64*)(codetmp) += 1;
-	*(UINT8*)(*(UINT64*)(codetmp)) = 0x89; *(UINT64*)(codetmp) += 1;
-	*(UINT8*)(*(UINT64*)(codetmp)) = 0xc0 | ((regid & 7) << 3); *(UINT64*)(codetmp) += 1;
+	* (UINT8*)(*(UINT64*)(codetmp)) = 0x48; *(UINT64*)(codetmp) += 1;
+	*(UINT8*)(*(UINT64*)(codetmp)) = 0xb8; *(UINT64*)(codetmp) += 1;
+	*(UINT64*)(*(UINT64*)(codetmp)) = imm64; *(UINT64*)(codetmp) += 8;
 	*(UINT8*)(*(UINT64*)(codetmp)) = 0xff; *(UINT64*)(codetmp) += 1;
 	*(UINT8*)(*(UINT64*)(codetmp)) = 0xe0; *(UINT64*)(codetmp) += 1;
 #else
-	* (UINT8*)(*(UINT32*)(codetmp)) = 0x89; *(UINT32*)(codetmp) += 1;
-	*(UINT8*)(*(UINT32*)(codetmp)) = 0xc0 | ((regid & 7) << 3); *(UINT32*)(codetmp) += 1;
+	* (UINT8*)(*(UINT64*)(codetmp)) = 0xb8; *(UINT64*)(codetmp) += 1;
+	*(UINT32*)(*(UINT64*)(codetmp)) = imm64; *(UINT64*)(codetmp) += 4;
 	*(UINT8*)(*(UINT32*)(codetmp)) = 0xff; *(UINT32*)(codetmp) += 1;
 	*(UINT8*)(*(UINT32*)(codetmp)) = 0xe0; *(UINT32*)(codetmp) += 1;
 #endif
@@ -1367,6 +1367,7 @@ UINT64 exec_jit() {
 	do {
 		instcache4genold = instcache4gen;
 		cpueipbak = CPU_EIP;
+#ifdef __M_ARM64
 #if 1
 
 		do {
@@ -1661,6 +1662,9 @@ UINT64 exec_jit() {
 		FlushInstructionCache(GetCurrentProcess(), instcache4genold, 4096 * 1024);
 		((void (*)())(instcache4gen))();
 		if (CPU_REMCLOCK > 0) { exec_1step(); }
+#else
+		exec_allstepfast();
+#endif
 	}while (CPU_REMCLOCK > 0);
 #endif
 	return CPU_REMCLOCK;
