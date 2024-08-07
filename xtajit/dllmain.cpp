@@ -1465,6 +1465,7 @@ extern "C" {
 				CPU_SET_MACTLFC((UINT32(*)(int, int, int))funcofmemaccess);
 			}
 		}
+		memtmp->wow64svctype = 0;
 		memtmp->i386finish = false;
 		//while (memtmp->i386finish == false) { memtmp->i386core->s.remainclock = 0x7fffffff; while ((memtmp->i386finish == false) && ((memtmp->i386core->s.remainclock) > 0)) { exec_1step(); } }
 		//printf("%08X08X\n", (((UINT64)&CPU_EXECUTE_INJIT) >> (32 * 1)), (((UINT64)&CPU_EXECUTE_INJIT) >> (32 * 0)));
@@ -1472,12 +1473,13 @@ extern "C" {
 		//memtmp->setntc(wow_context);
 		//while (memtmp->i386finish == false) { memtmp->i386core->s.remainclock = 200000000; while ((memtmp->i386finish == false) && ((memtmp->i386core->s.remainclock) > 0)) { exec_1step(); } }
 		if (jit_enabled == false) {
-			while (memtmp->i386finish == false) { memtmp->i386core->s.remainclock = 0x7fffffff; while ((memtmp->i386finish == false) && ((memtmp->i386core->s.remainclock) > 0)) { exec_1step(); } }
+			memtmp->i386core->s.remainclock = 0x7fffffff; exec_1step();
 		}
 		else {
-			while (memtmp->i386finish == false) { memtmp->i386core->s.remainclock = 0x7fffffff; while ((memtmp->i386finish == false) && ((memtmp->i386core->s.remainclock) > 0)) { CPU_EXECUTE_INJIT(); } }
+			memtmp->i386core->s.remainclock = 0x7fffffff; CPU_EXECUTE_INJIT();
 		}
 		UINT8 svctype = memtmp->wow64svctype;
+		if (memtmp->i386finish == false) { memtmp->setntc(wow_context); }
 		if (EMU_ID != -1) {
 			emusemaphore[EMU_ID].inuse = false;
 		}
