@@ -1472,6 +1472,7 @@ extern "C" {
 		//while (memtmp->i386finish == false) { memtmp->i386core->s.remainclock = 0x7fffffff; while ((memtmp->i386finish == false) && ((memtmp->i386core->s.remainclock) > 0)) { CPU_EXECUTE_INJIT(); } }
 		//memtmp->setntc(wow_context);
 		//while (memtmp->i386finish == false) { memtmp->i386core->s.remainclock = 200000000; while ((memtmp->i386finish == false) && ((memtmp->i386core->s.remainclock) > 0)) { exec_1step(); } }
+x86executemain:
 		if (jit_enabled == false) {
 			memtmp->i386core->s.remainclock = 0x7fffffff; exec_1step();
 		}
@@ -1480,6 +1481,7 @@ extern "C" {
 		}
 		UINT8 svctype = memtmp->wow64svctype;
 		if (memtmp->i386finish == false) { memtmp->setntc(wow_context); }
+		else { goto x86executemain; }
 		if (EMU_ID != -1) {
 			emusemaphore[EMU_ID].inuse = false;
 		}
