@@ -1480,8 +1480,7 @@ x86executemain:
 			memtmp->i386core->s.remainclock = 0x7fffffff; CPU_EXECUTE_INJIT();
 		}
 		UINT8 svctype = memtmp->wow64svctype;
-		if (memtmp->i386finish == false) { memtmp->setntc(wow_context); }
-		else { goto x86executemain; }
+		if (memtmp->i386finish == false) { memtmp->setntc(wow_context); goto x86executemain; }
 		if (EMU_ID != -1) {
 			emusemaphore[EMU_ID].inuse = false;
 		}
