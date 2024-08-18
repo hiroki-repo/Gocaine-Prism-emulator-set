@@ -242,6 +242,7 @@
     <ClCompile Include="..\np21_i386c\ia32\exception.cpp" />
     <ClCompile Include="..\np21_i386c\ia32\groups.cpp" />
     <ClCompile Include="..\np21_i386c\ia32\ia32.cpp" />
+    <ClCompile Include="..\np21_i386c\ia32\instructions\aesni\aesni.cpp" />
     <ClCompile Include="..\np21_i386c\ia32\instructions\bin_arith.cpp" />
     <ClCompile Include="..\np21_i386c\ia32\instructions\bit_byte.cpp" />
     <ClCompile Include="..\np21_i386c\ia32\instructions\ctrl_trans.cpp" />
