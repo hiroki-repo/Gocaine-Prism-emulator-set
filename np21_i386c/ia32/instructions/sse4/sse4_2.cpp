@@ -646,6 +646,106 @@ void SSE4_2_POPCNT_32(void)
 	if (tmp == 0){CPU_FLAG |=  Z_FLAG;}
 }
 
+void SSE4_2_LZCNT_16(void)
+{
+	int i;
+
+	UINT32 op;
+
+	UINT16* out;
+	UINT32 dst, madr, tmp, src;
+
+	if (!(i386cpuid.cpu_feature_ex_ecx & CPU_FEATURE_EX_ECX_ABM)) {
+		EXCEPTION(UD_EXCEPTION, 0);
+		return;
+	}
+
+	tmp = 0;
+
+	GET_PCBYTE((op));
+
+	if (op >= 0xc0) {
+		CPU_WORKCLOCK(21);
+		src = *(reg16_b20[op]);
+	}
+	else {
+		CPU_WORKCLOCK(24);
+		madr = calc_ea_dst(op);
+		src = cpu_vmemoryread_w(CPU_INST_SEGREG_INDEX, madr);
+	}
+
+	i = 15;
+	while((i >= 0) && (((src >> i) & 1) == 0)){
+		i--;
+		tmp++;
+	}
+
+	CPU_WORKCLOCK(2);
+	out = reg16_b53[op];
+	*out = (UINT16)tmp;
+
+	CPU_FLAG &= ~C_FLAG;
+	CPU_FLAG &= ~Z_FLAG;
+	CPU_FLAG &= ~S_FLAG;
+	CPU_FLAG &= ~O_FLAG;
+	CPU_FLAG &= ~A_FLAG;
+	CPU_FLAG &= ~P_FLAG;
+	if (tmp == 0) { CPU_FLAG |= Z_FLAG; }
+	if (tmp == 16) { CPU_FLAG |= C_FLAG; }
+}
+
+void SSE4_2_LZCNT_32(void)
+{
+	int i;
+
+	UINT32 op;
+
+	UINT32* out;
+	UINT32 dst, madr, tmp, src;
+
+	if (!(i386cpuid.cpu_feature_ex_ecx & CPU_FEATURE_EX_ECX_ABM)) {
+		EXCEPTION(UD_EXCEPTION, 0);
+		return;
+	}
+
+	tmp = 0;
+
+	GET_PCBYTE((op));
+
+	if (op >= 0xc0) {
+		CPU_WORKCLOCK(21);
+		src = *(reg32_b20[op]);
+	}
+	else {
+		CPU_WORKCLOCK(24);
+		madr = calc_ea_dst(op);
+		src = cpu_vmemoryread_d(CPU_INST_SEGREG_INDEX, madr);
+	}
+
+	i = 31;
+	while ((i >= 0) && (((src >> i) & 1) == 0)) {
+		i--;
+		tmp++;
+	}
+
+	CPU_WORKCLOCK(2);
+	out = reg32_b53[op];
+	*out = (UINT32)tmp;
+
+	CPU_FLAG &= ~C_FLAG;
+	CPU_FLAG &= ~Z_FLAG;
+	CPU_FLAG &= ~S_FLAG;
+	CPU_FLAG &= ~O_FLAG;
+	CPU_FLAG &= ~A_FLAG;
+	CPU_FLAG &= ~P_FLAG;
+	if (tmp == 0) { CPU_FLAG |= Z_FLAG; }
+	if (tmp == 32) { CPU_FLAG |= C_FLAG; }
+}
+
+void SSE4_2_LZCNT(void) {
+	if (CPU_INST_OP32) { SSE4_2_LZCNT_32(); } else { SSE4_2_LZCNT_16(); }
+}
+
 #else
 
 void SSE4_2_PCMPGTQ(void)
@@ -699,6 +799,21 @@ void SSE4_2_POPCNT_16(void)
 }
 
 void SSE4_2_POPCNT_32(void)
+{
+	EXCEPTION(UD_EXCEPTION, 0);
+}
+
+void SSE4_2_LZCNT(void)
+{
+	EXCEPTION(UD_EXCEPTION, 0);
+}
+
+void SSE4_2_LZCNT_16(void)
+{
+	EXCEPTION(UD_EXCEPTION, 0);
+}
+
+void SSE4_2_LZCNT_32(void)
 {
 	EXCEPTION(UD_EXCEPTION, 0);
 }

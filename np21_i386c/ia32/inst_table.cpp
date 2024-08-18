@@ -52,6 +52,7 @@
 #include "ia32/instructions/sse4/sse4_1.h"
 #include "ia32/instructions/sse4/sse4_2.h"
 #include "ia32/instructions/sse4a/sse4a.h"
+#include "ia32/instructions/aesni/aesni.h"
 
 /*
  * UNDEF OP
@@ -2751,7 +2752,7 @@ void (*insttable_2byteF30F_32[256])(void) = {
 	NULL,
 	NULL,
 	NULL,
-	NULL,
+	SSE4_2_LZCNT,
 	NULL,
 	NULL,
 
@@ -3303,11 +3304,11 @@ void (*insttable_3byte660F38_32[256])(void) = {
 	NULL,		/* D8 */
 	NULL,
 	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
+	AESNI_AESIMC,
+	AESNI_AESENC,
+	AESNI_AESENCLAST,
+	AESNI_AESDEC,
+	AESNI_AESDECLAST,
 	NULL,		/* E0 */
 	NULL,
 	NULL,
@@ -3670,7 +3671,7 @@ void (*insttable_3byte660F3A_32[256])(void) = {
 	SSE4_1_DPPD,
 	SSE4_1_MPSADBW,
 	NULL,
-	NULL,
+	PCLMULDQ_PCLMULQDQ,
 	NULL,
 	NULL,
 	NULL,
@@ -3825,7 +3826,7 @@ void (*insttable_3byte660F3A_32[256])(void) = {
 	NULL,
 	NULL,
 	NULL,
-	NULL,
+	AESNI_AESKEYGENASSIST,
 	NULL,		/* E0 */
 	NULL,
 	NULL,

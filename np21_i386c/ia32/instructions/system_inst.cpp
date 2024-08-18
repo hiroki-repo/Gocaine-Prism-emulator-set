@@ -1058,8 +1058,158 @@ HLT(void)
 void
 RSM(void)
 {
+	UINT32 op, src;
+	UINT32 reg;
 
-	ia32_panic("RSM: not implemented yet!");
+	if (CPU_STAT_CPL == 0xFF) { 
+			/*
+			 * 0 = PE (protect enable)
+			 * 1 = MP (monitor coprocesser)
+			 * 2 = EM (emulation)
+			 * 3 = TS (task switch)
+			 * 4 = ET (extend type, FPU present = 1)
+			 * 5 = NE (numeric error)
+			 * 16 = WP (write protect)
+			 * 18 = AM (alignment mask)
+			 * 29 = NW (not write-through)
+			 * 30 = CD (cache diable)
+			 * 31 = PG (pageing)
+			 */
+
+			 /* â∫ä™ p.182 äÑÇËçûÇ› 13 - àÍî ï€åÏó·äO */
+		src = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7ff8);
+		if ((src & (CPU_CR0_PE | CPU_CR0_PG)) == (UINT32)CPU_CR0_PG) {
+			EXCEPTION(GP_EXCEPTION, 0);
+		}
+		if ((src & (CPU_CR0_NW | CPU_CR0_CD)) == CPU_CR0_NW) {
+			EXCEPTION(GP_EXCEPTION, 0);
+		}
+
+		reg = CPU_CR0;
+		src &= CPU_CR0_ALL;
+#if defined(USE_FPU)
+		if (i386cpuid.cpu_feature & CPU_FEATURE_FPU) {
+			src |= CPU_CR0_ET;	/* FPU present */
+			//src &= ~CPU_CR0_EM;
+		}
+		else {
+			src |= CPU_CR0_EM | CPU_CR0_NE;
+			src &= ~(CPU_CR0_MP | CPU_CR0_ET);
+		}
+#else
+		src |= CPU_CR0_EM | CPU_CR0_NE;
+		src &= ~(CPU_CR0_MP | CPU_CR0_ET);
+#endif
+		CPU_CR0 = src;
+		VERBOSE(("MOV_CdRd: %04x:%08x: cr0: 0x%08x <- 0x%08x(%s)", CPU_CS, CPU_PREV_EIP, reg, CPU_CR0, reg32_str[op & 7]));
+
+		if ((reg ^ CPU_CR0) & (CPU_CR0_PE | CPU_CR0_PG)) {
+			tlb_flush_all();
+		}
+		if ((reg ^ CPU_CR0) & CPU_CR0_PE) {
+			if (CPU_CR0 & CPU_CR0_PE) {
+				change_pm(1);
+			}
+		}
+		if ((reg ^ CPU_CR0) & CPU_CR0_PG) {
+			if (CPU_CR0 & CPU_CR0_PG) {
+				change_pg(1);
+			}
+			else {
+				change_pg(0);
+			}
+		}
+		if ((reg ^ CPU_CR0) & CPU_CR0_PE) {
+			if (!(CPU_CR0 & CPU_CR0_PE)) {
+				change_pm(0);
+			}
+		}
+
+		src = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7ff0);
+		CPU_STAT_WP = (CPU_CR0 & CPU_CR0_WP) ? 0x10 : 0;
+		reg = CPU_CR3;
+		set_cr3(src);
+		CPU_EFLAG = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7fe8);
+		CPU_EIP = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7fd8);
+		CPU_DR6 = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7fd0);
+		CPU_DR7 = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7fc8);
+		CPU_TR = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7fc4);
+		CPU_LDTR = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7fc0);
+		CPU_GS = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7fbc);
+		CPU_FS = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7fb8);
+		CPU_DS = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7fb4);
+		CPU_SS = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7fb0);
+		CPU_CS = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7fac);
+		CPU_ES = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7fa8);
+		CPU_EDI = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7f94);
+		CPU_ESI = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7f8c);
+		CPU_EBP = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7f84);
+		CPU_ESP = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7f7c);
+		CPU_EBX = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7f74);
+		CPU_EDX = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7f6c);
+		CPU_ECX = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7f64);
+		CPU_EAX = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7f5c);
+		i386msr.reg.ia32_smbase_msr = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7ef8);
+		CPU_LDTR_BASE = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7e9c);
+		CPU_IDTR_BASE = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7e94);
+		CPU_GDTR_BASE = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7e8c);
+		src = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7e40);
+		/*
+		 * 10 = OSXMMEXCPT (support non masking exception by OS)
+		 * 9 = OSFXSR (support FXSAVE, FXRSTOR by OS)
+		 * 8 = PCE (performance monitoring counter enable)
+		 * 7 = PGE (page global enable)
+		 * 6 = MCE (machine check enable)
+		 * 5 = PAE (physical address extention)
+		 * 4 = PSE (page size extention)
+		 * 3 = DE (debug extention)
+		 * 2 = TSD (time stamp diable)
+		 * 1 = PVI (protected mode virtual interrupt)
+		 * 0 = VME (VM8086 mode extention)
+		 */
+		reg = CPU_CR4_PCE;		/* allow bit */
+		if (i386cpuid.cpu_feature & CPU_FEATURE_PGE) {
+			reg |= CPU_CR4_PGE;
+		}
+		if (i386cpuid.cpu_feature & CPU_FEATURE_VME) {
+			reg |= CPU_CR4_PVI | CPU_CR4_VME;
+		}
+		if (i386cpuid.cpu_feature & CPU_FEATURE_FXSR) {
+			reg |= CPU_CR4_OSFXSR;
+		}
+		if (i386cpuid.cpu_feature & CPU_FEATURE_SSE) {
+			reg |= CPU_CR4_OSXMMEXCPT;
+		}
+		if (src & ~reg) {
+			//if (src & 0xfffffc00) {
+			if (src & 0xfffff800) {
+				EXCEPTION(GP_EXCEPTION, 0);
+			}
+			if ((src & ~reg) != CPU_CR4_DE) { // XXX: debug extentionÇÕåxçêÇµÇ»Ç¢
+				ia32_warning("MOV_CdRd: CR4 <- 0x%08x", src);
+			}
+		}
+
+		reg = CPU_CR4;
+		CPU_CR4 = src;
+		VERBOSE(("MOV_CdRd: %04x:%08x: cr4: 0x%08x <- 0x%08x(%s)", CPU_CS, CPU_PREV_EIP, reg, CPU_CR4, reg32_str[op & 7]));
+
+		if ((reg ^ CPU_CR4) & (CPU_CR4_PSE | CPU_CR4_PGE | CPU_CR4_PAE | CPU_CR4_PVI | CPU_CR4_VME | CPU_CR4_OSFXSR | CPU_CR4_OSXMMEXCPT)) {
+			tlb_flush_all();
+		}
+		load_ldtr(CPU_LDTR, GP_EXCEPTION);
+		load_tr(CPU_TR);
+		load_descriptor(&CPU_STAT_SREG(CPU_GS_INDEX), CPU_GS);
+		load_descriptor(&CPU_STAT_SREG(CPU_FS_INDEX), CPU_FS);
+		load_descriptor(&CPU_STAT_SREG(CPU_DS_INDEX), CPU_DS);
+		load_descriptor(&CPU_STAT_SREG(CPU_SS_INDEX), CPU_SS);
+		load_descriptor(&CPU_STAT_SREG(CPU_CS_INDEX), CPU_CS);
+		load_descriptor(&CPU_STAT_SREG(CPU_ES_INDEX), CPU_ES);
+	}
+	else {
+		EXCEPTION(UD_EXCEPTION, 0);
+	}
+	CPU_STAT_USER_MODE = (CPU_STAT_CPL == 3) ? CPU_MODE_USER : CPU_MODE_SUPERVISER;
 }
 
 void
@@ -1093,6 +1243,10 @@ RDMSR(void)
 		CPU_EDX = 0x00000000;
 		CPU_EAX = 0xfee00800;
 		break;
+	case 0x9e:
+		CPU_EDX = (UINT32)((i386msr.reg.ia32_smbase_msr >> 32) & 0xffffffff);
+		CPU_EAX = (UINT32)((i386msr.reg.ia32_smbase_msr      ) & 0xffffffff);
+		break;
 	//case 0x1b:
 	//	CPU_EDX = 0x00000000;
 	//	CPU_EAX = 0x00000010;
@@ -1124,6 +1278,9 @@ WRMSR(void)
 		break;
 	case 0x176:
 		i386msr.reg.ia32_sysenter_eip = ((UINT64)CPU_EDX << 32) | ((UINT64)CPU_EAX);
+		break;
+	case 0x9e:
+		i386msr.reg.ia32_smbase_msr = ((UINT64)CPU_EDX << 32) | ((UINT64)CPU_EAX);
 		break;
 		/* MTRR Ç÷ÇÃèëÇ´çûÇ›éû tlb_flush_all(); */
 	default:

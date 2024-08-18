@@ -122,6 +122,8 @@
 #define USE_SSE4_1
 #define USE_SSE4_2
 #define USE_SSE4A
+#define USE_ABM
+#define USE_AESNI
 #define USE_TSC
 #define USE_FASTPAGING
 #define USE_VME
@@ -496,6 +498,7 @@ typedef struct {
 	UINT64 ia32_sysenter_cs; // SYSENTER CS   W X ^
 	UINT64 ia32_sysenter_esp; // SYSENTER ESP   W X ^
 	UINT64 ia32_sysenter_eip; // SYSENTER EIP   W X ^
+	UINT64 ia32_smbase_msr;
 } I386MSR_REG;
 typedef struct {
 	UINT32 version; // MSR o [ W     i X e [ g Z [ u ݊     ێ    邽 ߗp jI386MSR_VERSION   ŐV
@@ -755,6 +758,7 @@ extern sigjmp_buf	exec_1step_jmpbuf;
 #define	CPU_FEATURES_EX_AMD_K7_ATHLON_XP	(CPU_FEATURE_EX_3DNOW|CPU_FEATURE_EX_E3DNOW)
 
 /*** extended ECX feature ***/
+#define CPU_FEATURE_EX_ECX_ABM			(1 << 5)
 #define	CPU_FEATURE_EX_ECX_SSE4A		(1 << 6)
 
 #if defined(USE_MMX)&&defined(USE_FPU)&&defined(USE_3DNOW)&&defined(USE_SSE)&&defined(USE_SSE2)&&defined(USE_SSE3)&&defined(USE_SSE4A)
@@ -763,8 +767,14 @@ extern sigjmp_buf	exec_1step_jmpbuf;
 #define	CPU_FEATURE_EX_ECX_SSE4A_FLAG	0
 #endif
 
+#if defined(USE_MMX)&&defined(USE_FPU)&&defined(USE_SSE)&&defined(USE_SSE2)&&defined(USE_SSE3)&&defined(USE_SSSE3)&&defined(USE_SSE4_1)&&defined(USE_SSE4_2)&&defined(USE_ABM)
+#define CPU_FEATURE_EX_ECX_ABM_FLAG CPU_FEATURE_EX_ECX_ABM
+#else
+#define CPU_FEATURE_EX_ECX_ABM_FLAG 0
+#endif
+
 /*  g p ł   @ \ S   */
-#define	CPU_FEATURES_EX_ECX_ALL		(CPU_FEATURE_EX_ECX_SSE4A_FLAG)
+#define	CPU_FEATURES_EX_ECX_ALL		(CPU_FEATURE_EX_ECX_SSE4A_FLAG|CPU_FEATURE_EX_ECX_ABM_FLAG)
 
 #define	CPU_FEATURES_EX_ECX_CORE_I		(0)
 #define	CPU_FEATURES_EX_ECX_CORE_2_DUOW	(0)
@@ -820,6 +830,13 @@ extern sigjmp_buf	exec_1step_jmpbuf;
 /*				(1 << 30) */
 /*				(1 << 31) */
 
+
+#if defined(USE_AESNI) && defined(USE_SSSE3) && defined(USE_SSE3) && defined(USE_SSE2) && defined(USE_SSE) && defined(USE_FPU)
+#define CPU_FEATURE_ECX_AESNI_FLAG CPU_FEATURE_ECX_AES|CPU_FEATURE_ECX_PCLMULDQ
+#else
+#define CPU_FEATURE_ECX_AESNI_FLAG 0
+#endif
+
 #if defined(USE_MMX)&&defined(USE_FPU)&&defined(USE_SSE)&&defined(USE_SSE2)&&defined(USE_SSE3)&&defined(USE_SSSE3)&&defined(USE_SSE4_1)&&defined(USE_SSE4_2)
 #define	CPU_FEATURE_ECX_SSE4_2_FLAG	CPU_FEATURE_ECX_SSE4_2|CPU_FEATURE_ECX_POPCNT
 #else
@@ -845,7 +862,7 @@ extern sigjmp_buf	exec_1step_jmpbuf;
 #endif
 
 /*  g p ł   @ \ S   */
-#define	CPU_FEATURES_ECX_ALL	(CPU_FEATURE_ECX_SSE3_FLAG|CPU_FEATURE_ECX_SSSE3_FLAG|CPU_FEATURE_ECX_SSE4_1_FLAG|CPU_FEATURE_ECX_SSE4_2_FLAG)
+#define	CPU_FEATURES_ECX_ALL	(CPU_FEATURE_ECX_SSE3_FLAG|CPU_FEATURE_ECX_SSSE3_FLAG|CPU_FEATURE_ECX_SSE4_1_FLAG|CPU_FEATURE_ECX_SSE4_2_FLAG|CPU_FEATURE_ECX_AESNI_FLAG)
 
 #define	CPU_FEATURES_ECX_PENTIUM_4		(CPU_FEATURE_ECX_SSE3)
 #define	CPU_FEATURES_ECX_PENTIUM_M		(0)
