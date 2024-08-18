@@ -27,6 +27,7 @@
 
 #include <math.h>
 #include <float.h>
+#include <stdint.h>
 
 #define isnan(x) (_isnan(x))
 
