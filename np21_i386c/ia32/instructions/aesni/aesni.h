@@ -38,6 +38,7 @@ void AESNI_AESDEC(void);
 void AESNI_AESDECLAST(void);
 void AESNI_AESKEYGENASSIST(void);
 void PCLMULDQ_PCLMULQDQ(void);
+void CPUCALL RDRAND(UINT32);
 
 //#ifdef __cplusplus
 //}

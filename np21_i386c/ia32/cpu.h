@@ -124,6 +124,7 @@
 #define USE_SSE4A
 #define USE_ABM
 #define USE_AESNI
+#define USE_RDRAND
 #define USE_TSC
 #define USE_FASTPAGING
 #define USE_VME
@@ -827,9 +828,15 @@ extern sigjmp_buf	exec_1step_jmpbuf;
 #define	CPU_FEATURE_ECX_OSXSAVE		(1 << 27)
 /*				(1 << 28) */
 /*				(1 << 29) */
-/*				(1 << 30) */
+#define	CPU_FEATURE_ECX_RDRND		(1 << 30)
 /*				(1 << 31) */
 
+
+#if defined(USE_RDRAND) && defined(USE_SSSE3) && defined(USE_SSE3) && defined(USE_SSE2) && defined(USE_SSE) && defined(USE_FPU)
+#define CPU_FEATURE_ECX_RDRND_FLAG CPU_FEATURE_ECX_RDRND
+#else
+#define CPU_FEATURE_ECX_RDRND_FLAG 0
+#endif
 
 #if defined(USE_AESNI) && defined(USE_SSSE3) && defined(USE_SSE3) && defined(USE_SSE2) && defined(USE_SSE) && defined(USE_FPU)
 #define CPU_FEATURE_ECX_AESNI_FLAG CPU_FEATURE_ECX_AES|CPU_FEATURE_ECX_PCLMULDQ
@@ -862,7 +869,7 @@ extern sigjmp_buf	exec_1step_jmpbuf;
 #endif
 
 /*  g p ł   @ \ S   */
-#define	CPU_FEATURES_ECX_ALL	(CPU_FEATURE_ECX_SSE3_FLAG|CPU_FEATURE_ECX_SSSE3_FLAG|CPU_FEATURE_ECX_SSE4_1_FLAG|CPU_FEATURE_ECX_SSE4_2_FLAG|CPU_FEATURE_ECX_AESNI_FLAG)
+#define	CPU_FEATURES_ECX_ALL	(CPU_FEATURE_ECX_SSE3_FLAG|CPU_FEATURE_ECX_SSSE3_FLAG|CPU_FEATURE_ECX_SSE4_1_FLAG|CPU_FEATURE_ECX_SSE4_2_FLAG|CPU_FEATURE_ECX_AESNI_FLAG|CPU_FEATURE_ECX_RDRND_FLAG)
 
 #define	CPU_FEATURES_ECX_PENTIUM_4		(CPU_FEATURE_ECX_SSE3)
 #define	CPU_FEATURES_ECX_PENTIUM_M		(0)

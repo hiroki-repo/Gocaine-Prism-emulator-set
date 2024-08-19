@@ -109,7 +109,7 @@ MMX_setTag(void)
 }
 
 /*
- * SSE4.2 interface
+ * AES-NI interface
  */
 
  //  R [ h       ? ?? ?   ?  ? 
@@ -453,6 +453,62 @@ void AESNI_AESKEYGENASSIST(void) {
 }
 
 void PCLMULDQ_PCLMULQDQ(void) {
+	EXCEPTION(UD_EXCEPTION, 0);
+}
+
+#endif
+
+
+#if defined(USE_RDRAND) && defined(USE_SSSE3) && defined(USE_SSE3) && defined(USE_SSE2) && defined(USE_SSE) && defined(USE_FPU)
+
+void CPUCALL RDRAND(UINT32 op) {
+	UINT32* out32;
+	UINT16* out16;
+	UINT32 src, dst, res, madr;
+	if (!(i386cpuid.cpu_feature_ecx & CPU_FEATURE_ECX_RDRND)) {
+		EXCEPTION(UD_EXCEPTION, 0);
+		return;
+	}
+	CPU_FLAG &= ~Z_FLAG;
+	CPU_FLAG &= ~S_FLAG;
+	CPU_FLAG &= ~O_FLAG;
+	CPU_FLAG &= ~A_FLAG;
+	CPU_FLAG &= ~P_FLAG;
+	CPU_FLAG |=  C_FLAG;
+
+	if (CPU_INST_OP32) {
+		dst = (((((((CPU_REMCLOCK) & 0xFFFF) - ((CPU_REMCLOCK & 0xF00F) | ((CPU_EIP & 0xFF) << 4))) & 0xFFFF) | (((CPU_EIP & 0xFFFF) + CPU_REMCLOCK) << 16) & 0xFFFF0000)) & 0xFFFFFFFF);
+
+		if (op >= 0xc0) {
+			CPU_WORKCLOCK(2);
+			out32 = reg32_b20[op];
+			*out32 = dst;
+		}
+		else {
+			CPU_WORKCLOCK(5);
+			madr = calc_ea_dst(op);
+			cpu_vmemorywrite_d(CPU_INST_SEGREG_INDEX, madr, dst);
+		}
+	}
+	else {
+		dst = (((((((CPU_REMCLOCK) & 0xFF) - ((CPU_REMCLOCK & 0xF) | ((CPU_EIP & 0xF) << 4))) & 0x00FF) | (((CPU_EIP & 0xFF) + (CPU_REMCLOCK & 0xFF)) << 8) & 0xFF00)) & 0xFFFF);
+
+		if (op >= 0xc0) {
+			CPU_WORKCLOCK(2);
+			out16 = reg16_b20[op];
+			*out16 = dst;
+		}
+		else {
+			CPU_WORKCLOCK(5);
+			madr = calc_ea_dst(op);
+			cpu_vmemorywrite_w(CPU_INST_SEGREG_INDEX, madr, dst);
+		}
+	}
+}
+
+#else
+
+void CPUCALL RDRAND(UINT32 op) {
 	EXCEPTION(UD_EXCEPTION, 0);
 }
 

@@ -4702,6 +4702,6 @@ void (CPUCALL* insttable_G9[])(UINT32) = {
 	undef_op2,
 	undef_op2,
 	undef_op2,
-	undef_op2,
+	RDRAND,
 	undef_op2,
 };
