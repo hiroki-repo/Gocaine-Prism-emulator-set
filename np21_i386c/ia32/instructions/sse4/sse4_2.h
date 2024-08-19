@@ -44,6 +44,9 @@ void SSE4_2_POPCNT_32(void);
 void SSE4_2_LZCNT(void);
 void SSE4_2_LZCNT_16(void);
 void SSE4_2_LZCNT_32(void);
+void SSE4_2_TZCNT(void);
+void SSE4_2_TZCNT_16(void);
+void SSE4_2_TZCNT_32(void);
 
 //#ifdef __cplusplus
 //}

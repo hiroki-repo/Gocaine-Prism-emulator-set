@@ -2751,7 +2751,7 @@ void (*insttable_2byteF30F_32[256])(void) = {
 	NULL,
 	NULL,
 	NULL,
-	NULL,
+	SSE4_2_TZCNT,
 	SSE4_2_LZCNT,
 	NULL,
 	NULL,
