@@ -1142,6 +1142,8 @@ public:
 			(this->i386core->s.fpu_stat.xmm_reg[i].ul64[0]) = (*(XSAVE_FORMAT*)(ctx->ExtendedRegisters)).XmmRegisters[i].Low;
 			(this->i386core->s.fpu_stat.xmm_reg[i].ul64[1]) = (*(XSAVE_FORMAT*)(ctx->ExtendedRegisters)).XmmRegisters[i].High;
 		}
+		this->i386core->s.cpu_sysregs.mxcsr = (*(XSAVE_FORMAT*)(ctx->ExtendedRegisters)).MxCsr;
+		this->i386core->s.fpu_stat.mmxenable = (*(XSAVE_FORMAT*)(ctx->ExtendedRegisters)).TagWord;
 	}
 	void setntc(I386_CONTEXT* ctx) {
 		ctx->Eax = this->i386core->s.cpu_regs.reg[CPU_EAX_INDEX].d;
@@ -1175,6 +1177,7 @@ public:
 		}
 		for (int i = 0; i < 8; i++) {
 			memcpy((void*)(ctx->FloatSave.RegisterArea + (10 * i)), ((void*)((this->i386core->s.fpu_stat.reg) + (sizeof(this->i386core->s.fpu_stat.reg[0]) * i))), 10);
+			memcpy((void*)((*(XSAVE_FORMAT*)(ctx->ExtendedRegisters)).FloatRegisters + (16 * i)), ((void*)((this->i386core->s.fpu_stat.reg) + (sizeof(this->i386core->s.fpu_stat.reg[0]) * i))), 10);
 		}
 
 		ctx->Dr0 = this->i386core->s.cpu_regs.dr[0];
@@ -1188,6 +1191,10 @@ public:
 			(*(XSAVE_FORMAT*)(ctx->ExtendedRegisters)).XmmRegisters[i].Low = (this->i386core->s.fpu_stat.xmm_reg[i].ul64[0]);
 			(*(XSAVE_FORMAT*)(ctx->ExtendedRegisters)).XmmRegisters[i].High = (this->i386core->s.fpu_stat.xmm_reg[i].ul64[1]);
 		}
+		(*(XSAVE_FORMAT*)(ctx->ExtendedRegisters)).MxCsr = this->i386core->s.cpu_sysregs.mxcsr;
+		(*(XSAVE_FORMAT*)(ctx->ExtendedRegisters)).ControlWord = this->i386core->s.fpu_regs.control;
+		(*(XSAVE_FORMAT*)(ctx->ExtendedRegisters)).StatusWord = this->i386core->s.fpu_regs.status;
+		(*(XSAVE_FORMAT*)(ctx->ExtendedRegisters)).TagWord = this->i386core->s.fpu_stat.mmxenable;
 	}
 	static UINT32 i386memaccess(memaccessandpt* _this, UINT32 prm_0, UINT32 prm_1, UINT32 prm_2) {
 		switch (prm_2 & 0xff) {
