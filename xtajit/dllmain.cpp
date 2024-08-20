@@ -1177,7 +1177,6 @@ public:
 		}
 		for (int i = 0; i < 8; i++) {
 			memcpy((void*)(ctx->FloatSave.RegisterArea + (10 * i)), ((void*)((this->i386core->s.fpu_stat.reg) + (sizeof(this->i386core->s.fpu_stat.reg[0]) * i))), 10);
-			memcpy((void*)((*(XSAVE_FORMAT*)(ctx->ExtendedRegisters)).FloatRegisters + (16 * i)), ((void*)((this->i386core->s.fpu_stat.reg) + (sizeof(this->i386core->s.fpu_stat.reg[0]) * i))), 10);
 		}
 
 		ctx->Dr0 = this->i386core->s.cpu_regs.dr[0];
