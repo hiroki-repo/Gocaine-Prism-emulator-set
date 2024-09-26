@@ -5,10 +5,74 @@
 #include <stdio.h>
 #include "stdlib.h"
 #include "ntstatus.h"
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <exception>
 
-#include "../ARMv7/ARM/ARMv7_cpu.h"
+#include "dynarmic/interface/A32/a32.h"
+#include "dynarmic/interface/A32/config.h"
 
 #pragma warning(disable:4996)
+
+using u8 = std::uint8_t;
+using u16 = std::uint16_t;
+using u32 = std::uint32_t;
+using u64 = std::uint64_t;
+
+class VirtualAArch32 final : public Dynarmic::A32::UserCallbacks {
+public:
+	u64 ticks_left = 0;
+	int syscallno = -1;
+	u8 MemoryRead8(u32 vaddr) {
+		return (*(u8*)(vaddr & ((UINT64)0xFFFFFFFF)));
+	}
+	u16 MemoryRead16(u32 vaddr) override {
+		return (*(u16*)(vaddr & ((UINT64)0xFFFFFFFF)));
+	}
+	u32 MemoryRead32(u32 vaddr) override {
+		return (*(u32*)(vaddr & ((UINT64)0xFFFFFFFF)));
+	}
+	u64 MemoryRead64(u32 vaddr) override {
+		return (*(u64*)(vaddr & ((UINT64)0xFFFFFFFF)));
+	}
+
+	void MemoryWrite8(u32 vaddr, u8 value) override {
+		(*(u8*)(vaddr & ((UINT64)0xFFFFFFFF))) = value;
+	}
+	void MemoryWrite16(u32 vaddr, u16 value) override {
+		(*(u16*)(vaddr & ((UINT64)0xFFFFFFFF))) = value;
+	}
+	void MemoryWrite32(u32 vaddr, u32 value) override {
+		(*(u32*)(vaddr & ((UINT64)0xFFFFFFFF))) = value;
+	}
+	void MemoryWrite64(u32 vaddr, u64 value) override {
+		(*(u64*)(vaddr & ((UINT64)0xFFFFFFFF))) = value;
+	}
+
+	void InterpreterFallback(u32 pc, size_t num_instructions) override {
+		// This is never called in practice.
+		std::terminate();
+	}
+	void CallSVC(u32 swi) override {
+		// Do something.
+		ticks_left = 0;
+		syscallno = swi;
+	}
+	void ExceptionRaised(u32 pc, Dynarmic::A32::Exception exception) override {
+		// Do something.
+	}
+	void AddTicks(u64 ticks) override {
+		if (ticks > ticks_left) {
+			ticks_left = 0;
+			return;
+		}
+		ticks_left -= ticks;
+	}
+	u64 GetTicksRemaining() override {
+		return ticks_left;
+	}
+};
 
 typedef WINBASEAPI
 LPVOID
@@ -791,75 +855,76 @@ extern "C" {
 		ARM_CONTEXT* wow_context;
 		NTSTATUS ret;
 		RtlWow64GetCurrentCpuArea(NULL, (void**)&wow_context, NULL);
-		IRQ* emuirq = new IRQ(0xF8000000);
-		DTimer* emudtimer = new DTimer(0xFC000000, 0, emuirq);
-		Mem* emumem = new Mem(memaccessfunc, 2);
-		ARMV7_CPU* armv7cpu = new ARMV7_CPU(emumem,emudtimer);
-		armv7cpu->regs[0] = wow_context->R0;
-		armv7cpu->regs[1] = wow_context->R1;
-		armv7cpu->regs[2] = wow_context->R2;
-		armv7cpu->regs[3] = wow_context->R3;
-		armv7cpu->regs[4] = wow_context->R4;
-		armv7cpu->regs[5] = wow_context->R5;
-		armv7cpu->regs[6] = wow_context->R6;
-		armv7cpu->regs[7] = wow_context->R7;
-		armv7cpu->regs[8] = wow_context->R8;
-		armv7cpu->regs[9] = wow_context->R9;
-		armv7cpu->regs[10] = wow_context->R10;
-		armv7cpu->regs[11] = wow_context->R11;
-		armv7cpu->regs[12] = wow_context->R12;
-		armv7cpu->regs[13] = wow_context->Sp;
-		armv7cpu->regs[14] = wow_context->Lr;
-		armv7cpu->regs[15] = wow_context->Pc;
-		armv7cpu->cpsr = armv7cpu->parse_psr(wow_context->Cpsr);
-		while (((armv7cpu->regs[15]) & 0xFFFFFFFE) != (((UINT32)&bopcode) & 0xFFFFFFFE) && ((armv7cpu->regs[15]) & 0xFFFFFFFE) != (((UINT32)&unixbopcode) & 0xFFFFFFFE)) {
-			{
-				armv7cpu->regs[15] &= 0xFFFFFFFE;
-				armv7cpu->regs[15] |= ((armv7cpu->cpsr.t) & 1);
-				if (armv7cpu->cpsr.t) {// Thumb-2
-					UINT64 opcodeaddr4arm = armv7cpu->regs[15] & 0xFFFFFFFE;
-					UINT64 opcode4arm = armv7cpu->fetch_instruction(opcodeaddr4arm);
-					armv7cpu->exec(armv7cpu->decode_thumb(opcode4arm, opcodeaddr4arm), opcode4arm, opcodeaddr4arm);
-					armv7cpu->regs[15] += 2;
-				}
-				else 				  {// AArch32
-					UINT64 opcodeaddr4arm = armv7cpu->regs[15] & 0xFFFFFFFC;
-					UINT64 opcode4arm = armv7cpu->fetch_instruction(opcodeaddr4arm);
-					armv7cpu->exec(armv7cpu->decode(opcode4arm, opcodeaddr4arm), opcode4arm, opcodeaddr4arm);
-					armv7cpu->regs[15] += 4;
-				}
-				armv7cpu->cpsr.t = (armv7cpu->regs[15] & 1);
-			}
+		VirtualAArch32 *AARCH32 = new VirtualAArch32();
+		Dynarmic::A32::UserConfig* user_config = new Dynarmic::A32::UserConfig();
+		user_config->callbacks = AARCH32;
+		Dynarmic::A32::Jit* cpu = new Dynarmic::A32::Jit(*user_config);
+		AARCH32->ticks_left = 0xffffffff;
+		AARCH32->syscallno = -1;
+		cpu->Regs()[0] = wow_context->R0;
+		cpu->Regs()[1] = wow_context->R1;
+		cpu->Regs()[2] = wow_context->R2;
+		cpu->Regs()[3] = wow_context->R3;
+		cpu->Regs()[4] = wow_context->R4;
+		cpu->Regs()[5] = wow_context->R5;
+		cpu->Regs()[6] = wow_context->R6;
+		cpu->Regs()[7] = wow_context->R7;
+		cpu->Regs()[8] = wow_context->R8;
+		cpu->Regs()[9] = wow_context->R9;
+		cpu->Regs()[10] = wow_context->R10;
+		cpu->Regs()[11] = wow_context->R11;
+		cpu->Regs()[12] = wow_context->R12;
+		cpu->Regs()[13] = wow_context->Sp;
+		cpu->Regs()[14] = wow_context->Lr;
+		cpu->Regs()[15] = (wow_context->Pc & 0xFFFFFFFE);
+		cpu->SetCpsr(wow_context->Cpsr | ((wow_context->Pc & 1) << 5) | 0x10);
+#define cpuextregs(a) cpu->ExtRegs()[(4 * a) + 0] = ((UINT32)(wow_context->Q[a].Low >> (32 * 0)));\
+		cpu->ExtRegs()[(4 * a) + 1] = ((UINT32)(wow_context->Q[a].Low >> (32 * 1)));\
+		cpu->ExtRegs()[(4 * a) + 2] = ((UINT32)(wow_context->Q[a].High >> (32 * 0)));\
+		cpu->ExtRegs()[(4 * a) + 3] = ((UINT32)(wow_context->Q[a].High >> (32 * 1)))
+		for (int cnt = 0; cnt < 16; cnt++) {
+			cpuextregs(cnt);
 		}
-		wow_context->R0  = armv7cpu->regs[0];
-		wow_context->R1  = armv7cpu->regs[1];
-		wow_context->R2  = armv7cpu->regs[2];
-		wow_context->R3  = armv7cpu->regs[3];
-		wow_context->R4  = armv7cpu->regs[4];
-		wow_context->R5  = armv7cpu->regs[5];
-		wow_context->R6  = armv7cpu->regs[6];
-		wow_context->R7  = armv7cpu->regs[7];
-		wow_context->R8  = armv7cpu->regs[8];
-		wow_context->R9  = armv7cpu->regs[9];
-		wow_context->R10 = armv7cpu->regs[10];
-		wow_context->R11 = armv7cpu->regs[11];
-		wow_context->R12 = armv7cpu->regs[12];
-		wow_context->Sp  = armv7cpu->regs[13];
-		wow_context->Lr  = armv7cpu->regs[14];
-		wow_context->Pc  = armv7cpu->regs[15];
-		wow_context->Cpsr = armv7cpu->psr_to_value(&armv7cpu->cpsr);
-		UINT64 arm32pcaddr = armv7cpu->regs[15];
-		delete(armv7cpu);
-		delete(emumem);
-		delete(emudtimer);
-		delete(emuirq);
-		if (((arm32pcaddr) & 0xFFFFFFFE) == (((UINT32)&bopcode) & 0xFFFFFFFE)) {
+#undef cpuextregs
+		cpu->SetFpscr(wow_context->Fpscr);
+cpuexecuting:
+		cpu->Run();
+		if (AARCH32->syscallno == -1) { AARCH32->ticks_left = 0xffffffff; goto cpuexecuting; }
+		wow_context->R0  = cpu->Regs()[0];
+		wow_context->R1  = cpu->Regs()[1];
+		wow_context->R2  = cpu->Regs()[2];
+		wow_context->R3  = cpu->Regs()[3];
+		wow_context->R4  = cpu->Regs()[4];
+		wow_context->R5  = cpu->Regs()[5];
+		wow_context->R6  = cpu->Regs()[6];
+		wow_context->R7  = cpu->Regs()[7];
+		wow_context->R8  = cpu->Regs()[8];
+		wow_context->R9  = cpu->Regs()[9];
+		wow_context->R10 = cpu->Regs()[10];
+		wow_context->R11 = cpu->Regs()[11];
+		wow_context->R12 = cpu->Regs()[12];
+		wow_context->Sp  = cpu->Regs()[13];
+		wow_context->Lr  = cpu->Regs()[14];
+		wow_context->Pc  = (cpu->Regs()[15] & 0xFFFFFFFE) | ((cpu->Fpscr() >> 5) & 1);
+		wow_context->Cpsr = cpu->Cpsr();
+#define cpuextregs(a) wow_context->Q[a].Low = (((UINT64)(cpu->ExtRegs()[(4 * a) + 0])) | (((UINT64)(cpu->ExtRegs()[(4 * a) + 1])) << 32));\
+		wow_context->Q[a].High = (((UINT64)(cpu->ExtRegs()[(4 * a) + 2])) | (((UINT64)(cpu->ExtRegs()[(4 * a) + 3])) << 32));
+		for (int cnt = 0; cnt < 16; cnt++) {
+			cpuextregs(cnt);
+		}
+#undef cpuextregs
+		wow_context->Fpscr = cpu->Fpscr();
+		int syscallnoloc = AARCH32->syscallno;
+		delete(cpu);
+		delete(user_config);
+		delete(AARCH32);
+		if (syscallnoloc == 0) {
 			wow_context->R0 = Wow64SystemServiceEx(wow_context->R12, (UINT*)ULongToPtr(wow_context->Sp));
 			wow_context->Pc = wow_context->Lr;
 			wow_context->Lr = wow_context->R3;
 			wow_context->Sp += (4 * 4);
 		}
-		else if (((arm32pcaddr) & 0xFFFFFFFE) == (((UINT32)&unixbopcode) & 0xFFFFFFFE)) {
+		else if (syscallnoloc == 1) {
 			wow_context->R0  = p__wine_unix_call(((UINT64)((((UINT64)wow_context->R0) << (32 * 0)) | (((UINT64)wow_context->R1) << (32 * 1)))), wow_context->R2, (UINT*)ULongToPtr(wow_context->R3));
 			wow_context->Pc = wow_context->Lr;
 		}
