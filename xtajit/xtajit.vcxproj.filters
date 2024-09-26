@@ -167,8 +167,5 @@
     <ClCompile Include="..\np21_i386c\ia32\jit.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="..\np21_i386c\ia32\instructions\aesni\aesni.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
   </ItemGroup>
 </Project>
