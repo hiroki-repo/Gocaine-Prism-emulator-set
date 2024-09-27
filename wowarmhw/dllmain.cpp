@@ -9,70 +9,43 @@
 #include <cstdint>
 #include <cstdio>
 #include <exception>
+#include <iostream>
+#include <atomic>
 
 #include "dynarmic/interface/A32/a32.h"
 #include "dynarmic/interface/A32/config.h"
+#include "dynarmic/interface/A32/coprocessor.h"
 
 #pragma warning(disable:4996)
+
+typedef NTSTATUS WINAPI typeof_Wow64RaiseException(int, EXCEPTION_RECORD*);
+typeof_Wow64RaiseException* Wow64RaiseException;
 
 using u8 = std::uint8_t;
 using u16 = std::uint16_t;
 using u32 = std::uint32_t;
 using u64 = std::uint64_t;
 
-class VirtualAArch32 final : public Dynarmic::A32::UserCallbacks {
-public:
-	u64 ticks_left = 0;
-	int syscallno = -1;
-	u8 MemoryRead8(u32 vaddr) {
-		return (*(u8*)(vaddr & ((UINT64)0xFFFFFFFF)));
-	}
-	u16 MemoryRead16(u32 vaddr) override {
-		return (*(u16*)(vaddr & ((UINT64)0xFFFFFFFF)));
-	}
-	u32 MemoryRead32(u32 vaddr) override {
-		return (*(u32*)(vaddr & ((UINT64)0xFFFFFFFF)));
-	}
-	u64 MemoryRead64(u32 vaddr) override {
-		return (*(u64*)(vaddr & ((UINT64)0xFFFFFFFF)));
-	}
+inline bool atomic_compare_and_swap(volatile uint8_t* pointer, uint8_t value, uint8_t expected) {
+	const uint8_t result = _InterlockedCompareExchange8(reinterpret_cast<volatile char*>(pointer), value, expected);
+	return result == expected;
+}
 
-	void MemoryWrite8(u32 vaddr, u8 value) override {
-		(*(u8*)(vaddr & ((UINT64)0xFFFFFFFF))) = value;
-	}
-	void MemoryWrite16(u32 vaddr, u16 value) override {
-		(*(u16*)(vaddr & ((UINT64)0xFFFFFFFF))) = value;
-	}
-	void MemoryWrite32(u32 vaddr, u32 value) override {
-		(*(u32*)(vaddr & ((UINT64)0xFFFFFFFF))) = value;
-	}
-	void MemoryWrite64(u32 vaddr, u64 value) override {
-		(*(u64*)(vaddr & ((UINT64)0xFFFFFFFF))) = value;
-	}
+inline bool atomic_compare_and_swap(volatile uint16_t* pointer, uint16_t value, uint16_t expected) {
+	const uint16_t result = _InterlockedCompareExchange16(reinterpret_cast<volatile short*>(pointer), value, expected);
+	return result == expected;
+}
 
-	void InterpreterFallback(u32 pc, size_t num_instructions) override {
-		// This is never called in practice.
-		std::terminate();
-	}
-	void CallSVC(u32 swi) override {
-		// Do something.
-		ticks_left = 0;
-		syscallno = swi;
-	}
-	void ExceptionRaised(u32 pc, Dynarmic::A32::Exception exception) override {
-		// Do something.
-	}
-	void AddTicks(u64 ticks) override {
-		if (ticks > ticks_left) {
-			ticks_left = 0;
-			return;
-		}
-		ticks_left -= ticks;
-	}
-	u64 GetTicksRemaining() override {
-		return ticks_left;
-	}
-};
+inline bool atomic_compare_and_swap(volatile uint32_t* pointer, uint32_t value, uint32_t expected) {
+	const uint32_t result = _InterlockedCompareExchange(reinterpret_cast<volatile long*>(pointer), value, expected);
+	return result == expected;
+}
+
+inline bool atomic_compare_and_swap(volatile uint64_t* pointer, uint64_t value, uint64_t expected) {
+	const uint64_t result = _InterlockedCompareExchange64(reinterpret_cast<volatile __int64*>(pointer),
+		value, expected);
+	return result == expected;
+}
 
 typedef WINBASEAPI
 LPVOID
@@ -515,6 +488,7 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 		if (HM2 == 0) { HM2 = LoadLibraryA("C:\\Windows\\System32\\Wow64.dll"); }
 		if (HM2 == 0) { return false; }
 		Wow64SystemServiceEx = (t_Wow64SystemServiceEx*)GetProcAddress(HM2, "Wow64SystemServiceEx");
+		Wow64RaiseException = (typeof_Wow64RaiseException*)GetProcAddress(HM2, "Wow64RaiseException");
 		if (!p__wine_unix_call) {
 			p__wine_unix_call = (t__wine_unix_call*)GetProcAddress(hofntdll, "__wine_unix_call");
 		}
@@ -621,8 +595,8 @@ typedef struct _ARM_CONTEXT
 	ULONG Padding2[2];              /* 198 */
 } ARM_CONTEXT;
 
-char bopcode[] = { 0x00,0x00,0x00,0xef,0x0e,0xf0,0xa0,0xe1 };
-char unixbopcode[] = { 0x01,0x00,0x00,0xef,0x0e,0xf0,0xa0,0xe1 };
+__declspec(align(4)) char bopcode[] = { 0x00,0x00,0x00,0xef,0x0e,0xf0,0xa0,0xe1 };
+__declspec(align(4)) char unixbopcode[] = { 0x01,0x00,0x00,0xef,0x0e,0xf0,0xa0,0xe1 };
 #ifndef ThreadWow64Context
 #define ThreadWow64Context (THREADINFOCLASS)0x1d
 #endif
@@ -841,6 +815,228 @@ UINT32 memaccessfunc(UINT32 prm_0, UINT32 prm_1, UINT32 prm_2) {
 	return 0;
 }
 
+class VirtualCoproc final : public Dynarmic::A32::Coprocessor {
+public:
+	u32 dummy_value;
+	u32 uprw;
+	u32 uro;
+	using CoprocReg = Dynarmic::A32::CoprocReg;
+
+	~VirtualCoproc() override = default;
+
+	std::optional<Callback> CompileInternalOperation(bool two, unsigned opc1, CoprocReg CRd,
+		CoprocReg CRn, CoprocReg CRm,
+		unsigned opc2) override {
+		return Callback{
+			[](void*, std::uint32_t, std::uint32_t) -> std::uint64_t {
+				return 0;
+			},
+			std::nullopt,
+		};
+	}
+
+	CallbackOrAccessOneWord CompileSendOneWord(bool two, unsigned opc1, CoprocReg CRn,
+		CoprocReg CRm, unsigned opc2) override {
+		if (!two && CRn == CoprocReg::C7 && opc1 == 0 && CRm == CoprocReg::C5 && opc2 == 4) {
+			// CP15_FLUSH_PREFETCH_BUFFER
+			// This is a dummy write, we ignore the value written here.
+			return &dummy_value;
+		}
+
+		if (!two && CRn == CoprocReg::C7 && opc1 == 0 && CRm == CoprocReg::C10) {
+			switch (opc2) {
+			case 4:
+				// CP15_DATA_SYNC_BARRIER
+				return Callback{
+					[](void*, std::uint32_t, std::uint32_t) -> std::uint64_t {
+						return 0;
+					},
+					std::nullopt,
+				};
+			case 5:
+				// CP15_DATA_MEMORY_BARRIER
+				return Callback{
+					[](void*, std::uint32_t, std::uint32_t) -> std::uint64_t {
+						return 0;
+					},
+					std::nullopt,
+				};
+			}
+		}
+
+		if (!two && CRn == CoprocReg::C13 && opc1 == 0 && CRm == CoprocReg::C0 && opc2 == 2) {
+			// CP15_THREAD_UPRW
+			return &uprw;
+		}
+		return CallbackOrAccessOneWord{};
+	}
+
+	CallbackOrAccessTwoWords CompileSendTwoWords(bool two, unsigned opc, CoprocReg CRm) override {
+		return CallbackOrAccessTwoWords{};
+	}
+
+	CallbackOrAccessOneWord CompileGetOneWord(bool two, unsigned opc1, CoprocReg CRn, CoprocReg CRm,
+		unsigned opc2) override {
+		if (!two && CRn == CoprocReg::C13 && opc1 == 0 && CRm == CoprocReg::C0) {
+			switch (opc2) {
+			case 2:
+				// CP15_THREAD_UPRW
+				return &uprw;
+			case 3:
+				// CP15_THREAD_URO
+				return &uro;
+			}
+		}
+		return CallbackOrAccessOneWord{};
+	}
+
+	CallbackOrAccessTwoWords CompileGetTwoWords(bool two, unsigned opc, CoprocReg CRm) override {
+		if (!two && opc == 0 && CRm == CoprocReg::C14) {
+			// CNTPCT
+			const auto callback = [](void* arg, u32, u32) -> u64 {
+				return 0;
+			};
+			return Callback{ callback, std::nullopt };
+		}
+		return CallbackOrAccessTwoWords{};
+	}
+
+	std::optional<Callback> CompileLoadWords(bool two, bool long_transfer, CoprocReg CRd,
+		std::optional<std::uint8_t> option) override {
+		return std::nullopt;
+	}
+
+	std::optional<Callback> CompileStoreWords(bool two, bool long_transfer, CoprocReg CRd,
+		std::optional<std::uint8_t> option) override {
+		return std::nullopt;
+	}
+};
+
+class VirtualAArch32 final : public Dynarmic::A32::UserCallbacks {
+public:
+	ARM_CONTEXT* wow_context;
+	Dynarmic::A32::Jit* cpu;
+	u64 ticks_left = 0;
+	int syscallno = -1;
+	u8 MemoryRead8(u32 vaddr) override {
+		return (*(u8*)(vaddr & ((UINT64)0xFFFFFFFF)));
+	}
+	u16 MemoryRead16(u32 vaddr) override {
+		return (*(u16*)(vaddr & ((UINT64)0xFFFFFFFF)));
+	}
+	u32 MemoryRead32(u32 vaddr) override {
+		return (*(u32*)(vaddr & ((UINT64)0xFFFFFFFF)));
+	}
+	u64 MemoryRead64(u32 vaddr) override {
+		return (*(u64*)(vaddr & ((UINT64)0xFFFFFFFF)));
+	}
+
+	void MemoryWrite8(u32 vaddr, u8 value) override {
+		(*(u8*)(vaddr & ((UINT64)0xFFFFFFFF))) = value;
+	}
+	void MemoryWrite16(u32 vaddr, u16 value) override {
+		(*(u16*)(vaddr & ((UINT64)0xFFFFFFFF))) = value;
+	}
+	void MemoryWrite32(u32 vaddr, u32 value) override {
+		(*(u32*)(vaddr & ((UINT64)0xFFFFFFFF))) = value;
+	}
+	void MemoryWrite64(u32 vaddr, u64 value) override {
+		(*(u64*)(vaddr & ((UINT64)0xFFFFFFFF))) = value;
+	}
+
+	bool MemoryWriteExclusive8(u32 vaddr, std::uint8_t value, std::uint8_t expected) override {
+		return atomic_compare_and_swap(((u8*)(vaddr & ((UINT64)0xFFFFFFFF))), value, expected);
+	}
+	bool MemoryWriteExclusive16(u32 vaddr, std::uint16_t value, std::uint16_t expected) override {
+		return atomic_compare_and_swap(((u16*)(vaddr & ((UINT64)0xFFFFFFFF))), value, expected);
+	}
+	bool MemoryWriteExclusive32(u32 vaddr, std::uint32_t value, std::uint32_t expected) override {
+		return atomic_compare_and_swap(((u32*)(vaddr & ((UINT64)0xFFFFFFFF))), value, expected);
+	}
+	bool MemoryWriteExclusive64(u32 vaddr, std::uint64_t value, std::uint64_t expected) override {
+		return atomic_compare_and_swap(((u64*)(vaddr & ((UINT64)0xFFFFFFFF))), value, expected);
+	}
+
+	void InterpreterFallback(u32 pc, size_t num_instructions) override {
+		// This is never called in practice.
+		//std::terminate();
+		wow_context->Cpsr = cpu->Cpsr() & 0xFFFFFFE0;
+		wow_context->R0 = cpu->Regs()[0];
+		wow_context->R1 = cpu->Regs()[1];
+		wow_context->R2 = cpu->Regs()[2];
+		wow_context->R3 = cpu->Regs()[3];
+		wow_context->R4 = cpu->Regs()[4];
+		wow_context->R5 = cpu->Regs()[5];
+		wow_context->R6 = cpu->Regs()[6];
+		wow_context->R7 = cpu->Regs()[7];
+		wow_context->R8 = cpu->Regs()[8];
+		wow_context->R9 = cpu->Regs()[9];
+		wow_context->R10 = cpu->Regs()[10];
+		wow_context->R11 = cpu->Regs()[11];
+		wow_context->R12 = cpu->Regs()[12];
+		wow_context->Sp = cpu->Regs()[13];
+		wow_context->Lr = cpu->Regs()[14];
+		wow_context->Pc = (cpu->Regs()[15] & 0xFFFFFFFE) | ((wow_context->Cpsr >> 5) & 1);
+		wow_context->Fpscr = cpu->Fpscr();
+#define cpuextregs(a) wow_context->Q[a].Low = (((UINT64)(cpu->ExtRegs()[(4 * a) + 0])) | (((UINT64)(cpu->ExtRegs()[(4 * a) + 1])) << 32));\
+		wow_context->Q[a].High = (((UINT64)(cpu->ExtRegs()[(4 * a) + 2])) | (((UINT64)(cpu->ExtRegs()[(4 * a) + 3])) << 32))
+		for (int cnt = 0; cnt < 16; cnt++) {
+			cpuextregs(cnt);
+		}
+#undef cpuextregs
+		EXCEPTION_RECORD rec;
+		rec.ExceptionCode = EXCEPTION_ILLEGAL_INSTRUCTION;
+		Wow64RaiseException(-1, &rec);
+	}
+	void CallSVC(u32 swi) override {
+		// Do something.
+		ticks_left = 0;
+		syscallno = swi;
+		cpu->HaltExecution();
+		return;
+	}
+	void ExceptionRaised(u32 pc, Dynarmic::A32::Exception exception) override {
+		// Do something.
+		wow_context->Cpsr = cpu->Cpsr() & 0xFFFFFFE0;
+		wow_context->R0 = cpu->Regs()[0];
+		wow_context->R1 = cpu->Regs()[1];
+		wow_context->R2 = cpu->Regs()[2];
+		wow_context->R3 = cpu->Regs()[3];
+		wow_context->R4 = cpu->Regs()[4];
+		wow_context->R5 = cpu->Regs()[5];
+		wow_context->R6 = cpu->Regs()[6];
+		wow_context->R7 = cpu->Regs()[7];
+		wow_context->R8 = cpu->Regs()[8];
+		wow_context->R9 = cpu->Regs()[9];
+		wow_context->R10 = cpu->Regs()[10];
+		wow_context->R11 = cpu->Regs()[11];
+		wow_context->R12 = cpu->Regs()[12];
+		wow_context->Sp = cpu->Regs()[13];
+		wow_context->Lr = cpu->Regs()[14];
+		wow_context->Pc = (cpu->Regs()[15] & 0xFFFFFFFE) | ((wow_context->Cpsr >> 5) & 1);
+		wow_context->Fpscr = cpu->Fpscr();
+#define cpuextregs(a) wow_context->Q[a].Low = (((UINT64)(cpu->ExtRegs()[(4 * a) + 0])) | (((UINT64)(cpu->ExtRegs()[(4 * a) + 1])) << 32));\
+		wow_context->Q[a].High = (((UINT64)(cpu->ExtRegs()[(4 * a) + 2])) | (((UINT64)(cpu->ExtRegs()[(4 * a) + 3])) << 32))
+		for (int cnt = 0; cnt < 16; cnt++) {
+			cpuextregs(cnt);
+		}
+#undef cpuextregs
+		EXCEPTION_RECORD rec;
+		rec.ExceptionCode = EXCEPTION_ACCESS_VIOLATION;
+		Wow64RaiseException((int)exception, &rec);
+	}
+	void AddTicks(u64 ticks) override {
+		if (ticks > ticks_left) {
+			ticks_left = 0;
+			return;
+		}
+		ticks_left -= ticks;
+	}
+	u64 GetTicksRemaining() override {
+		return ticks_left;
+	}
+};
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -852,85 +1048,94 @@ extern "C" {
     __declspec(dllexport) NTSTATUS WINAPI BTCpuResetToConsistentState(EXCEPTION_POINTERS* ptrs) { return STATUS_SUCCESS; }
     __declspec(dllexport) NTSTATUS WINAPI BTCpuSetContext(HANDLE thread, HANDLE process, void* unknown, ARM_CONTEXT* ctx) { return NtSetInformationThread_alternative(thread, ThreadWow64Context, ctx, sizeof(*ctx)); }
     __declspec(dllexport) void WINAPI BTCpuSimulate(void) {
+firsttoemu:
 		ARM_CONTEXT* wow_context;
 		NTSTATUS ret;
 		RtlWow64GetCurrentCpuArea(NULL, (void**)&wow_context, NULL);
-		VirtualAArch32 *AARCH32 = new VirtualAArch32();
-		Dynarmic::A32::UserConfig* user_config = new Dynarmic::A32::UserConfig();
-		user_config->callbacks = AARCH32;
-		Dynarmic::A32::Jit* cpu = new Dynarmic::A32::Jit(*user_config);
-		AARCH32->ticks_left = 0xffffffff;
-		AARCH32->syscallno = -1;
-		cpu->Regs()[0] = wow_context->R0;
-		cpu->Regs()[1] = wow_context->R1;
-		cpu->Regs()[2] = wow_context->R2;
-		cpu->Regs()[3] = wow_context->R3;
-		cpu->Regs()[4] = wow_context->R4;
-		cpu->Regs()[5] = wow_context->R5;
-		cpu->Regs()[6] = wow_context->R6;
-		cpu->Regs()[7] = wow_context->R7;
-		cpu->Regs()[8] = wow_context->R8;
-		cpu->Regs()[9] = wow_context->R9;
-		cpu->Regs()[10] = wow_context->R10;
-		cpu->Regs()[11] = wow_context->R11;
-		cpu->Regs()[12] = wow_context->R12;
-		cpu->Regs()[13] = wow_context->Sp;
-		cpu->Regs()[14] = wow_context->Lr;
-		cpu->Regs()[15] = (wow_context->Pc & 0xFFFFFFFE);
-		cpu->SetCpsr(wow_context->Cpsr | ((wow_context->Pc & 1) << 5) | 0x10);
-#define cpuextregs(a) cpu->ExtRegs()[(4 * a) + 0] = ((UINT32)(wow_context->Q[a].Low >> (32 * 0)));\
-		cpu->ExtRegs()[(4 * a) + 1] = ((UINT32)(wow_context->Q[a].Low >> (32 * 1)));\
-		cpu->ExtRegs()[(4 * a) + 2] = ((UINT32)(wow_context->Q[a].High >> (32 * 0)));\
-		cpu->ExtRegs()[(4 * a) + 3] = ((UINT32)(wow_context->Q[a].High >> (32 * 1)))
+		VirtualAArch32 AARCH32;
+		VirtualCoproc Coproc;
+		Dynarmic::A32::UserConfig user_config;
+		user_config.callbacks = &AARCH32;
+		/*for (int cnt = 0; cnt < 16; cnt++) {
+			user_config.coprocessors[cnt] = (std::shared_ptr<VirtualCoproc>) & Coproc;
+		}*/
+		user_config.coprocessors[15] = (std::shared_ptr<VirtualCoproc>) & Coproc;
+		Dynarmic::A32::Jit cpu{ user_config };
+		AARCH32.cpu = &cpu;
+		AARCH32.ticks_left = 1;
+		AARCH32.syscallno = -1;
+		AARCH32.wow_context = wow_context;
+		(NtCurrentTeb()->TlsSlots[0]) = (PVOID)&AARCH32;
+		cpu.SetCpsr((wow_context->Cpsr & 0xFFFFFFE0) | ((wow_context->Pc & 1) << 5) | 0x10);
+		cpu.Regs()[0] = wow_context->R0;
+		cpu.Regs()[1] = wow_context->R1;
+		cpu.Regs()[2] = wow_context->R2;
+		cpu.Regs()[3] = wow_context->R3;
+		cpu.Regs()[4] = wow_context->R4;
+		cpu.Regs()[5] = wow_context->R5;
+		cpu.Regs()[6] = wow_context->R6;
+		cpu.Regs()[7] = wow_context->R7;
+		cpu.Regs()[8] = wow_context->R8;
+		cpu.Regs()[9] = wow_context->R9;
+		cpu.Regs()[10] = wow_context->R10;
+		cpu.Regs()[11] = wow_context->R11;
+		cpu.Regs()[12] = wow_context->R12;
+		cpu.Regs()[13] = wow_context->Sp;
+		cpu.Regs()[14] = wow_context->Lr;
+		cpu.Regs()[15] = (wow_context->Pc & 0xFFFFFFFE);
+		cpu.SetFpscr(wow_context->Fpscr);
+#define cpuextregs(a) cpu.ExtRegs()[(4 * a) + 0] = ((UINT32)(wow_context->Q[a].Low >> (32 * 0)));\
+		cpu.ExtRegs()[(4 * a) + 1] = ((UINT32)(wow_context->Q[a].Low >> (32 * 1)));\
+		cpu.ExtRegs()[(4 * a) + 2] = ((UINT32)(wow_context->Q[a].High >> (32 * 0)));\
+		cpu.ExtRegs()[(4 * a) + 3] = ((UINT32)(wow_context->Q[a].High >> (32 * 1)))
 		for (int cnt = 0; cnt < 16; cnt++) {
 			cpuextregs(cnt);
 		}
 #undef cpuextregs
-		cpu->SetFpscr(wow_context->Fpscr);
-cpuexecuting:
-		cpu->Run();
-		if (AARCH32->syscallno == -1) { AARCH32->ticks_left = 0xffffffff; goto cpuexecuting; }
-		wow_context->R0  = cpu->Regs()[0];
-		wow_context->R1  = cpu->Regs()[1];
-		wow_context->R2  = cpu->Regs()[2];
-		wow_context->R3  = cpu->Regs()[3];
-		wow_context->R4  = cpu->Regs()[4];
-		wow_context->R5  = cpu->Regs()[5];
-		wow_context->R6  = cpu->Regs()[6];
-		wow_context->R7  = cpu->Regs()[7];
-		wow_context->R8  = cpu->Regs()[8];
-		wow_context->R9  = cpu->Regs()[9];
-		wow_context->R10 = cpu->Regs()[10];
-		wow_context->R11 = cpu->Regs()[11];
-		wow_context->R12 = cpu->Regs()[12];
-		wow_context->Sp  = cpu->Regs()[13];
-		wow_context->Lr  = cpu->Regs()[14];
-		wow_context->Pc  = (cpu->Regs()[15] & 0xFFFFFFFE) | ((cpu->Fpscr() >> 5) & 1);
-		wow_context->Cpsr = cpu->Cpsr();
-#define cpuextregs(a) wow_context->Q[a].Low = (((UINT64)(cpu->ExtRegs()[(4 * a) + 0])) | (((UINT64)(cpu->ExtRegs()[(4 * a) + 1])) << 32));\
-		wow_context->Q[a].High = (((UINT64)(cpu->ExtRegs()[(4 * a) + 2])) | (((UINT64)(cpu->ExtRegs()[(4 * a) + 3])) << 32));
+		while ((AARCH32.syscallno == -1)) { cpu.Run(); if ((cpu.Regs()[15] & 0xFFFFFFFE) == (UINT32)&bopcode) { AARCH32.syscallno = 0; } else if ((cpu.Regs()[15] & 0xFFFFFFFE) == (UINT32)&unixbopcode) { AARCH32.syscallno = 1; } if (AARCH32.syscallno == -1) { AARCH32.ticks_left = 1; } }
+		wow_context->Cpsr = cpu.Cpsr() & 0xFFFFFFE0;
+		wow_context->R0  = cpu.Regs()[0];
+		wow_context->R1  = cpu.Regs()[1];
+		wow_context->R2  = cpu.Regs()[2];
+		wow_context->R3  = cpu.Regs()[3];
+		wow_context->R4  = cpu.Regs()[4];
+		wow_context->R5  = cpu.Regs()[5];
+		wow_context->R6  = cpu.Regs()[6];
+		wow_context->R7  = cpu.Regs()[7];
+		wow_context->R8  = cpu.Regs()[8];
+		wow_context->R9  = cpu.Regs()[9];
+		wow_context->R10 = cpu.Regs()[10];
+		wow_context->R11 = cpu.Regs()[11];
+		wow_context->R12 = cpu.Regs()[12];
+		wow_context->Sp  = cpu.Regs()[13];
+		wow_context->Lr  = cpu.Regs()[14];
+		wow_context->Pc  = (cpu.Regs()[15] & 0xFFFFFFFE) | ((wow_context->Cpsr >> 5) & 1);
+		wow_context->Fpscr = cpu.Fpscr();
+#define cpuextregs(a) wow_context->Q[a].Low = (((UINT64)(cpu.ExtRegs()[(4 * a) + 0])) | (((UINT64)(cpu.ExtRegs()[(4 * a) + 1])) << 32));\
+		wow_context->Q[a].High = (((UINT64)(cpu.ExtRegs()[(4 * a) + 2])) | (((UINT64)(cpu.ExtRegs()[(4 * a) + 3])) << 32))
 		for (int cnt = 0; cnt < 16; cnt++) {
 			cpuextregs(cnt);
 		}
 #undef cpuextregs
-		wow_context->Fpscr = cpu->Fpscr();
-		int syscallnoloc = AARCH32->syscallno;
-		delete(cpu);
-		delete(user_config);
-		delete(AARCH32);
+		int syscallnoloc = AARCH32.syscallno;
 		if (syscallnoloc == 0) {
 			wow_context->R0 = Wow64SystemServiceEx(wow_context->R12, (UINT*)ULongToPtr(wow_context->Sp));
 			wow_context->Pc = wow_context->Lr;
 			wow_context->Lr = wow_context->R3;
 			wow_context->Sp += (4 * 4);
+			goto firsttoemu;
 		}
 		else if (syscallnoloc == 1) {
 			wow_context->R0  = p__wine_unix_call(((UINT64)((((UINT64)wow_context->R0) << (32 * 0)) | (((UINT64)wow_context->R1) << (32 * 1)))), wow_context->R2, (UINT*)ULongToPtr(wow_context->R3));
 			wow_context->Pc = wow_context->Lr;
+			goto firsttoemu;
 		}
+		return;
     }
+	__declspec(dllexport) void WINAPI BTCpuFlushInstructionCache2(uint32_t prm_0, SIZE_T prm_1) { ((VirtualAArch32*)(NtCurrentTeb()->TlsSlots[0]))->cpu->InvalidateCacheRange(prm_0, prm_1); }
+	__declspec(dllexport) void WINAPI BTCpuFlushInstructionCacheHeavy(uint32_t prm_0, SIZE_T prm_1) { if (prm_0 == 0 && prm_1 == 0) { ((VirtualAArch32*)(NtCurrentTeb()->TlsSlots[0]))->cpu->ClearCache(); } else { ((VirtualAArch32*)(NtCurrentTeb()->TlsSlots[0]))->cpu->InvalidateCacheRange(prm_0, prm_1); } }
 	__declspec(dllexport) void* WINAPI __wine_get_unix_opcode(void) { return (UINT32*)&unixbopcode; }
-	__declspec(dllexport) BOOLEAN WINAPI BTCpuIsProcessorFeaturePresent(UINT feature) { if (feature == 2 || feature == 3 || feature == 6 || feature == 7 || feature == 8 || feature == 10 || feature == 13 || feature == 17 || feature == 36 || feature == 37 || feature == 38) { return true; } return false; }
+	__declspec(dllexport) BOOLEAN WINAPI BTCpuIsProcessorFeaturePresent(UINT feature) { if (feature == 18 || feature == 24 || feature == 25 || feature == 26 || feature == 27 || feature == 29) { return true; } return false; }
 	__declspec(dllexport) NTSTATUS WINAPI BTCpuTurboThunkControl(ULONG enable) { if (enable) { return STATUS_NOT_SUPPORTED; } return STATUS_SUCCESS; }
 
 #ifdef __cplusplus
