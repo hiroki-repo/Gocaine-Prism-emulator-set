@@ -1037,6 +1037,8 @@ public:
 	}
 };
 
+static inline void* get_wow_teb(__TEB* teb) { return teb->WowTebOffset ? (void*)((char*)teb + teb->WowTebOffset) : NULL; }
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -1084,6 +1086,8 @@ firsttoemu:
 		cpu.Regs()[14] = wow_context->Lr;
 		cpu.Regs()[15] = (wow_context->Pc & 0xFFFFFFFE);
 		cpu.SetFpscr(wow_context->Fpscr);
+		__TEB* teb = (__TEB*)NtCurrentTeb();
+		Coproc.uprw = PtrToUlong(get_wow_teb(teb));
 #define cpuextregs(a) cpu.ExtRegs()[(4 * a) + 0] = ((UINT32)(wow_context->Q[a].Low >> (32 * 0)));\
 		cpu.ExtRegs()[(4 * a) + 1] = ((UINT32)(wow_context->Q[a].Low >> (32 * 1)));\
 		cpu.ExtRegs()[(4 * a) + 2] = ((UINT32)(wow_context->Q[a].High >> (32 * 0)));\
