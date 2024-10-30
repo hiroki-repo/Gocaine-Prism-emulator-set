@@ -492,6 +492,9 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 		if (!p__wine_unix_call) {
 			p__wine_unix_call = (t__wine_unix_call*)GetProcAddress(hofntdll, "__wine_unix_call");
 		}
+		if (!p__wine_unix_call) {
+			p__wine_unix_call = (*((t__wine_unix_call**)GetProcAddress(hofntdll, "__wine_unix_call_dispatcher")));
+		}
 	case DLL_THREAD_ATTACH:
     case DLL_THREAD_DETACH:
     case DLL_PROCESS_DETACH:
@@ -987,6 +990,7 @@ public:
 		EXCEPTION_RECORD rec;
 		rec.ExceptionCode = EXCEPTION_ILLEGAL_INSTRUCTION;
 		Wow64RaiseException(-1, &rec);
+		return;
 	}
 	void CallSVC(u32 swi) override {
 		// Do something.
@@ -1024,6 +1028,7 @@ public:
 		EXCEPTION_RECORD rec;
 		rec.ExceptionCode = EXCEPTION_ACCESS_VIOLATION;
 		Wow64RaiseException((int)exception, &rec);
+		return;
 	}
 	void AddTicks(u64 ticks) override {
 		if (ticks > ticks_left) {
@@ -1050,7 +1055,6 @@ extern "C" {
     __declspec(dllexport) NTSTATUS WINAPI BTCpuResetToConsistentState(EXCEPTION_POINTERS* ptrs) { return STATUS_SUCCESS; }
     __declspec(dllexport) NTSTATUS WINAPI BTCpuSetContext(HANDLE thread, HANDLE process, void* unknown, ARM_CONTEXT* ctx) { return NtSetInformationThread_alternative(thread, ThreadWow64Context, ctx, sizeof(*ctx)); }
     __declspec(dllexport) void WINAPI BTCpuSimulate(void) {
-firsttoemu:
 		ARM_CONTEXT* wow_context;
 		NTSTATUS ret;
 		RtlWow64GetCurrentCpuArea(NULL, (void**)&wow_context, NULL);
@@ -1063,11 +1067,14 @@ firsttoemu:
 		}*/
 		user_config.coprocessors[15] = (std::shared_ptr<VirtualCoproc>) & Coproc;
 		Dynarmic::A32::Jit cpu{ user_config };
+firsttoemu:
 		AARCH32.cpu = &cpu;
 		AARCH32.ticks_left = 1;
 		AARCH32.syscallno = -1;
 		AARCH32.wow_context = wow_context;
 		(NtCurrentTeb()->TlsSlots[0]) = (PVOID)&AARCH32;
+		__TEB* teb = (__TEB*)NtCurrentTeb();
+		Coproc.uprw = PtrToUlong(get_wow_teb(teb));
 		cpu.SetCpsr((wow_context->Cpsr & 0xFFFFFFE0) | ((wow_context->Pc & 1) << 5) | 0x10);
 		cpu.Regs()[0] = wow_context->R0;
 		cpu.Regs()[1] = wow_context->R1;
@@ -1086,8 +1093,6 @@ firsttoemu:
 		cpu.Regs()[14] = wow_context->Lr;
 		cpu.Regs()[15] = (wow_context->Pc & 0xFFFFFFFE);
 		cpu.SetFpscr(wow_context->Fpscr);
-		__TEB* teb = (__TEB*)NtCurrentTeb();
-		Coproc.uprw = PtrToUlong(get_wow_teb(teb));
 #define cpuextregs(a) cpu.ExtRegs()[(4 * a) + 0] = ((UINT32)(wow_context->Q[a].Low >> (32 * 0)));\
 		cpu.ExtRegs()[(4 * a) + 1] = ((UINT32)(wow_context->Q[a].Low >> (32 * 1)));\
 		cpu.ExtRegs()[(4 * a) + 2] = ((UINT32)(wow_context->Q[a].High >> (32 * 0)));\

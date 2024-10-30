@@ -730,6 +730,9 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 		if (!p__wine_unix_call) {
 			p__wine_unix_call = (t__wine_unix_call*)GetProcAddress(hofntdll, "__wine_unix_call");
 		}
+		if (!p__wine_unix_call) {
+			p__wine_unix_call = (*((t__wine_unix_call**)GetProcAddress(hofntdll, "__wine_unix_call_dispatcher")));
+		}
 #if 0
 		emusemaphore[0].inuse = false;
 		emusemaphore[0].np21w = hModule;
@@ -1105,13 +1108,6 @@ public:
 			this->i386core->s.cpu_stat.sreg[CPU_FS_INDEX].u.seg.limit = 0xffffffff;
 			this->i386core->s.cpu_stat.sreg[CPU_GS_INDEX].u.seg.limit = 0xffffffff;
 
-			this->i386core->s.cpu_stat.sreg[CPU_ES_INDEX].d = 1;
-			this->i386core->s.cpu_stat.sreg[CPU_CS_INDEX].d = 1;
-			this->i386core->s.cpu_stat.sreg[CPU_SS_INDEX].d = 1;
-			this->i386core->s.cpu_stat.sreg[CPU_DS_INDEX].d = 1;
-			this->i386core->s.cpu_stat.sreg[CPU_FS_INDEX].d = 1;
-			this->i386core->s.cpu_stat.sreg[CPU_GS_INDEX].d = 1;
-
 			this->i386core->s.cpu_stat.protected_mode = 1;
 			this->i386core->s.cpu_stat.ss_32 = 1;
 			this->i386core->s.cpu_inst.op_32 = 1;
@@ -1123,14 +1119,15 @@ public:
 			this->i386core->s.cpu_sysregs.gdtr_limit = 71;
 			this->i386core->s.cpu_sysregs.idtr_base = (UINT32)idt;
 			this->i386core->s.cpu_sysregs.idtr_limit = 255;
-			this->i386core->s.cpu_stat.ldtr.u.seg.segbase = (UINT32)ldt;
-			this->i386core->s.cpu_stat.ldtr.u.seg.limit = 0xffffffff;
+			this->i386core->s.cpu_sysregs.ldtr = (UINT32)ldt;
 		}
 
 		this->i386core->s.fpu_regs.status = ctx->FloatSave.StatusWord;
 		this->i386core->s.fpu_regs.control = ctx->FloatSave.ControlWord;
 		for (int i = 0; i < 8; i++) {
 			this->i386core->s.fpu_stat.tag[i] = ((FP_TAG)((ctx->FloatSave.TagWord >> (2 * i)) & 3));
+			/*if ((ctx->FloatSave.TagWord >> (2 * i)) & 3) this->i386core->s.fpu_stat.tag[i] = TAG_Zero;
+			else this->i386core->s.fpu_stat.tag[i] = TAG_Valid;*/
 		}
 		this->i386core->s.fpu_regs.tag = ctx->FloatSave.TagWord;
 		for (int i = 0; i < 8; i++) {
@@ -1173,6 +1170,7 @@ public:
 		ctx->FloatSave.ControlWord = this->i386core->s.fpu_regs.control;
 		ctx->FloatSave.TagWord = 0;
 		for (int i = 0; i < 8; i++) {
+			//ctx->FloatSave.TagWord |= (((this->i386core->s.fpu_stat.tag[i] == 0) ? TAG_Empty : TAG_Valid) << (2 * i));
 			ctx->FloatSave.TagWord |= ((this->i386core->s.fpu_stat.tag[i] & 3) << (2 * i));
 		}
 		for (int i = 0; i < 8; i++) {
@@ -1191,38 +1189,31 @@ public:
 			(*(XSAVE_FORMAT*)(ctx->ExtendedRegisters)).XmmRegisters[i].High = (this->i386core->s.fpu_stat.xmm_reg[i].ul64[1]);
 		}
 	}
-#ifdef _WIN64
-	static UINT32 i386memaccess(UINT64 prm_0, UINT32 prm_1, UINT32 prm_2) {
-#else
-	static UINT32 i386memaccess(UINT32 prm_0, UINT32 prm_1, UINT32 prm_2) {
-#endif
+	static UINT32 i386memaccess(memaccessandpt* _this, UINT32 prm_0, UINT32 prm_1, UINT32 prm_2) {
 		switch (prm_2 & 0xff) {
 		case 0x00:
 			(*(UINT8*)(prm_0)) = prm_1;
-			return 0;
 			break;
 		case 0x01:
 			return (*(UINT8*)(prm_0));
 			break;
 		case 0x10:
 			(*(UINT16*)(prm_0)) = prm_1;
-			return 0;
 			break;
 		case 0x11:
 			return (*(UINT16*)(prm_0));
 			break;
 		case 0x20:
 			(*(UINT32*)(prm_0)) = prm_1;
-			return 0;
 			break;
 		case 0x21:
 			return (*(UINT32*)(prm_0));
 			break;
 		case 0x23:
-			memaccessandpt * _this = (memaccessandpt*)(NtCurrentTeb()->TlsSlots[0]);
-			DWORD* Param;
+			DWORD * Param;
 			DWORD Func;
 			UINT32 ret = 0;
+			//_this->setntc(_this->i386_context);
 			if (prm_0 == 0) {
 				_this->setntc(_this->i386_context);
 #if 0
@@ -1251,7 +1242,7 @@ public:
 				_this->i386finish = true;
 				_this->i386core->s.remainclock = 0;
 #endif
-		}
+			}
 			else if (prm_0 == 0xe5) {
 				Param = (DWORD*)_this->i386core->s.cpu_regs.reg[CPU_EAX_INDEX].d;
 				Func = *(DWORD*)(_this->i386core->s.cpu_regs.eip.d - 2 - 4);
@@ -1278,12 +1269,108 @@ public:
 					ret = ((func*)(Func64))(Param);
 				}
 			}
+			//_this->i386_context->Eax = ret;
+			//_this->setctn(_this->i386_context,0);
 			return ret;
 			break;
-	}
+		}
 		return 0;
 	}
 };
+
+#ifdef _WIN64
+UINT32 i386memaccess_4e(UINT64 prm_0, UINT32 prm_1, UINT32 prm_2) {
+#else
+UINT32 i386memaccess_4e(UINT32 prm_0, UINT32 prm_1, UINT32 prm_2) {
+#endif
+	switch (prm_2 & 0xff) {
+	case 0x00:
+		(*(UINT8*)(prm_0)) = prm_1;
+		break;
+	case 0x01:
+		return (*(UINT8*)(prm_0));
+		break;
+	case 0x10:
+		(*(UINT16*)(prm_0)) = prm_1;
+		break;
+	case 0x11:
+		return (*(UINT16*)(prm_0));
+		break;
+	case 0x20:
+		(*(UINT32*)(prm_0)) = prm_1;
+		break;
+	case 0x21:
+		return (*(UINT32*)(prm_0));
+		break;
+	case 0x23:
+		memaccessandpt * _this = (memaccessandpt*)(NtCurrentTeb()->TlsSlots[0]);
+		DWORD * Param;
+		DWORD Func;
+		UINT32 ret = 0;
+		//_this->setntc(_this->i386_context);
+		if (prm_0 == 0) {
+			_this->setntc(_this->i386_context);
+#if 0
+			if (Wow64SystemServiceEx != 0) {
+				ret = Wow64SystemServiceEx(_this->i386_context->Eax, (UINT*)ULongToPtr(_this->i386_context->Esp + 8));
+				_this->i386finish = true;
+				_this->i386core->s.remainclock = 0;
+			}
+#else
+			_this->wow64svctype = 1;
+			_this->i386finish = true;
+			_this->i386core->s.remainclock = 0;
+#endif
+		}
+		else if (prm_0 == 4) {
+			_this->setntc(_this->i386_context);
+#if 0
+			UINT32* p = (UINT32*)ULongToPtr(_this->i386_context->Esp);
+			if (p__wine_unix_call != 0) {
+				ret = p__wine_unix_call((*(UINT64*)((void*)&p[1])), (UINT32)p[3], ULongToPtr(p[4]));
+				_this->i386finish = true;
+				_this->i386core->s.remainclock = 0;
+			}
+#else
+			_this->wow64svctype = 2;
+			_this->i386finish = true;
+			_this->i386core->s.remainclock = 0;
+#endif
+		}
+		else if (prm_0 == 0xe5) {
+			Param = (DWORD*)_this->i386core->s.cpu_regs.reg[CPU_EAX_INDEX].d;
+			Func = *(DWORD*)(_this->i386core->s.cpu_regs.eip.d - 2 - 4);
+			if ((0x80000000 & Func) == 0)
+			{
+				Func = 0x80000000 | (DWORD)GetHookAddress(((char*)((*(DWORD*)(Func + (4 * 0))))), ((char*)((*(DWORD*)(Func + (4 * 1))))));
+				*(DWORD*)(_this->i386core->s.cpu_regs.eip.d - 2 - 4) = Func;
+			}
+			if (Func != 0x80000000 && Func != 0) {
+				ret = ((func*)(0x7fffffff & Func))(Param);
+			}
+		}
+		else if (prm_0 == 0xe6) {
+			Param = (DWORD*)_this->i386core->s.cpu_regs.reg[CPU_EAX_INDEX].d;
+			Func = *(DWORD*)(_this->i386core->s.cpu_regs.eip.d - 2 - 4);
+			if (Func != 0) {
+				ret = ((func*)(((UINT64)0xffffffff) & Func))(Param);
+			}
+		}
+		else if (prm_0 == 0xe7) {
+			Param = (DWORD*)_this->i386core->s.cpu_regs.reg[CPU_EAX_INDEX].d;
+			UINT64 Func64 = *(UINT64*)(_this->i386core->s.cpu_regs.eip.d - 2 - 8);
+			if (Func64 != 0) {
+				ret = ((func*)(Func64))(Param);
+			}
+		}
+		//_this->i386_context->Eax = ret;
+		//_this->setctn(_this->i386_context,0);
+		return ret;
+		break;
+	}
+	return 0;
+}
+
 
 UINT32 Excroutine_DE(UINT32 esp) {
 	EXCEPTION_RECORD rec;
@@ -1295,40 +1382,10 @@ UINT32 Excroutine_DE(UINT32 esp) {
 	RtlRaiseException(&rec);
 	return 0;
 }
-UINT32 Excroutine_DB(UINT32 esp) {
-	EXCEPTION_RECORD rec;
-	rec.ExceptionCode = EXCEPTION_SINGLE_STEP;
-	rec.ExceptionFlags = 0;
-	rec.ExceptionRecord = NULL;
-	rec.ExceptionAddress = (LPVOID)(*(UINT32*)(((UINT64)esp) + 8));
-	rec.NumberParameters = 0;
-	RtlRaiseException(&rec);
-	return 0;
-}
 UINT32 Excroutine_BP(UINT32 esp) {
 	EXCEPTION_RECORD rec;
 	rec.ExceptionCode = STATUS_BREAKPOINT;
 	rec.ExceptionFlags = 0;
-	rec.ExceptionRecord = NULL;
-	rec.ExceptionAddress = (LPVOID)(*(UINT32*)(((UINT64)esp) + 8));
-	rec.NumberParameters = 1;
-	RtlRaiseException(&rec);
-	return 0;
-}
-UINT32 Excroutine_OF(UINT32 esp) {
-	EXCEPTION_RECORD rec;
-	rec.ExceptionCode = EXCEPTION_INT_OVERFLOW;
-	rec.ExceptionFlags = EXCEPTION_NONCONTINUABLE;
-	rec.ExceptionRecord = NULL;
-	rec.ExceptionAddress = (LPVOID)(*(UINT32*)(((UINT64)esp) + 8));
-	rec.NumberParameters = 0;
-	RtlRaiseException(&rec);
-	return 0;
-}
-UINT32 Excroutine_BR(UINT32 esp) {
-	EXCEPTION_RECORD rec;
-	rec.ExceptionCode = EXCEPTION_ARRAY_BOUNDS_EXCEEDED;
-	rec.ExceptionFlags = EXCEPTION_NONCONTINUABLE;
 	rec.ExceptionRecord = NULL;
 	rec.ExceptionAddress = (LPVOID)(*(UINT32*)(((UINT64)esp) + 8));
 	rec.NumberParameters = 0;
@@ -1345,72 +1402,13 @@ UINT32 Excroutine_UD(UINT32 esp) {
 	RtlRaiseException(&rec);
 	return 0;
 }
-UINT32 Excroutine_CSO(UINT32 esp) {
-	EXCEPTION_RECORD rec;
-	rec.ExceptionCode = EXCEPTION_FLT_INVALID_OPERATION;
-	rec.ExceptionFlags = EXCEPTION_NONCONTINUABLE;
-	rec.ExceptionRecord = NULL;
-	rec.ExceptionAddress = (LPVOID)(*(UINT32*)(((UINT64)esp) + 8));
-	rec.NumberParameters = 0;
-	RtlRaiseException(&rec);
-	return 0;
-}
-UINT32 Excroutine_SS(UINT32 esp) {
-	EXCEPTION_RECORD rec;
-	rec.ExceptionCode = EXCEPTION_STACK_OVERFLOW;
-	rec.ExceptionFlags = EXCEPTION_NONCONTINUABLE;
-	rec.ExceptionRecord = NULL;
-	rec.ExceptionAddress = (LPVOID)(*(UINT32*)(((UINT64)esp) + 8));
-	rec.NumberParameters = 0;
-	RtlRaiseException(&rec);
-	return 0;
-}
-UINT32 Excroutine_GP(UINT32 esp) {
-	EXCEPTION_RECORD rec;
-	rec.ExceptionCode = EXCEPTION_PRIV_INSTRUCTION;
-	rec.ExceptionFlags = EXCEPTION_NONCONTINUABLE;
-	rec.ExceptionRecord = NULL;
-	rec.ExceptionAddress = (LPVOID)(*(UINT32*)(((UINT64)esp) + 8));
-	rec.NumberParameters = 0;
-	RtlRaiseException(&rec);
-	return 0;
-}
-UINT32 Excroutine_FF(UINT32 esp) {
-	EXCEPTION_RECORD rec;
-	rec.ExceptionCode = STATUS_STACK_BUFFER_OVERRUN;
-	rec.ExceptionFlags = EXCEPTION_NONCONTINUABLE;
-	rec.ExceptionRecord = NULL;
-	rec.ExceptionAddress = (LPVOID)(*(UINT32*)(((UINT64)esp) + 8));
-	rec.NumberParameters = 1;
-	RtlRaiseException(&rec);
-	return 0;
-}
-UINT32 Excroutine_DS(UINT32 esp) {
-	EXCEPTION_RECORD rec;
-	(*(UINT32*)(((UINT64)esp) + 8)) += 3;
-	rec.ExceptionCode = EXCEPTION_BREAKPOINT;
-	rec.ExceptionFlags = 0;
-	rec.ExceptionRecord = NULL;
-	rec.ExceptionAddress = (LPVOID)(*(UINT32*)(((UINT64)esp) + 8));
-	rec.NumberParameters = 1;
-	RtlRaiseException(&rec);
-	return 0;
-}
 
 #define EXCEPTION_x86_routine_gen(addr,popstksz) {0x50,0x9c,0x89,0xe0,0xeb,0x08,((((UINT64)(addr))>>(8*0))&0xFF),((((UINT64)(addr))>>(8*1))&0xFF),((((UINT64)(addr))>>(8*2))&0xFF),((((UINT64)(addr))>>(8*3))&0xFF),((((UINT64)(addr))>>(8*4))&0xFF),((((UINT64)(addr))>>(8*5))&0xFF),((((UINT64)(addr))>>(8*6))&0xFF),((((UINT64)(addr))>>(8*7))&0xFF),0xe5,0xe7,0x83,0xc4,(((popstksz)>>(8*0))&0xFF),0x9d,0x58,0xcf}
 #define IDT_x86_descriptor_gen(addr,segselector) {(((((addr)>>(16*0))&0xFFFF)<<(16*0))|(((segselector)&0xFFFF)<<(16*1))),(((((addr)>>(16*1))&0xFFFF)<<(16*1))|(0x8F00<<(16*0)))}
 
 UINT8 Excroutine_DE_bop[] = EXCEPTION_x86_routine_gen(&Excroutine_DE, 0);
-UINT8 Excroutine_DB_bop[] = EXCEPTION_x86_routine_gen(&Excroutine_DB, 0);
 UINT8 Excroutine_BP_bop[] = EXCEPTION_x86_routine_gen(&Excroutine_BP, 0);
-UINT8 Excroutine_OF_bop[] = EXCEPTION_x86_routine_gen(&Excroutine_OF, 0);
-UINT8 Excroutine_BR_bop[] = EXCEPTION_x86_routine_gen(&Excroutine_BR, 0);
 UINT8 Excroutine_UD_bop[] = EXCEPTION_x86_routine_gen(&Excroutine_UD, 0);
-UINT8 Excroutine_CSO_bop[] = EXCEPTION_x86_routine_gen(&Excroutine_CSO, 0);
-UINT8 Excroutine_SS_bop[] = EXCEPTION_x86_routine_gen(&Excroutine_SS, 4);
-UINT8 Excroutine_GP_bop[] = EXCEPTION_x86_routine_gen(&Excroutine_GP, 4);
-UINT8 Excroutine_FF_bop[] = EXCEPTION_x86_routine_gen(&Excroutine_FF, 0);
-UINT8 Excroutine_DS_bop[] = EXCEPTION_x86_routine_gen(&Excroutine_DS, 0);
 
 #ifdef __cplusplus
 extern "C" {
@@ -1419,7 +1417,7 @@ extern "C" {
 	__declspec(dllexport) void* WINAPI BTCpuGetBopCode(void) { return (UINT32*)&bopcode; }
 	__declspec(dllexport) NTSTATUS WINAPI BTCpuGetContext(HANDLE thread, HANDLE process, void* unknown, I386_CONTEXT* ctx) { return NtQueryInformationThread_alternative(thread, ThreadWow64Context, ctx, sizeof(*ctx), NULL); }
 	__declspec(dllexport) NTSTATUS WINAPI BTCpuProcessInit(void) { if ((ULONG_PTR)BTCpuProcessInit >> 32) { return STATUS_INVALID_ADDRESS; } return STATUS_SUCCESS; }
-	__declspec(dllexport) NTSTATUS WINAPI BTCpuThreadInit(void) { UINT32 idt4ds[] = IDT_x86_descriptor_gen(((UINT32)&Excroutine_DS_bop), 0x8); UINT32 idt4ff[] = IDT_x86_descriptor_gen(((UINT32)&Excroutine_FF_bop), 0x8); UINT32 idt4gp[] = IDT_x86_descriptor_gen(((UINT32)&Excroutine_GP_bop), 0x8); UINT32 idt4ss[] = IDT_x86_descriptor_gen(((UINT32)&Excroutine_SS_bop), 0x8); UINT32 idt4cso[] = IDT_x86_descriptor_gen(((UINT32)&Excroutine_CSO_bop), 0x8); UINT32 idt4ud[] = IDT_x86_descriptor_gen(((UINT32)&Excroutine_UD_bop), 0x8); UINT32 idt4br[] = IDT_x86_descriptor_gen(((UINT32)&Excroutine_BR_bop), 0x8); UINT32 idt4of[] = IDT_x86_descriptor_gen(((UINT32)&Excroutine_OF_bop), 0x8); UINT32 idt4bp[] = IDT_x86_descriptor_gen(((UINT32)&Excroutine_BP_bop), 0x8); UINT32 idt4db[] = IDT_x86_descriptor_gen(((UINT32)&Excroutine_DB_bop), 0x8); UINT32 idt4de[] = IDT_x86_descriptor_gen(((UINT32)&Excroutine_DE_bop), 0x8); idt = (char*)RtlAllocateHeap(GetProcessHeap(), HEAP_ZERO_MEMORY, 255 * 8); memcpy(idt + (8 * 0x2d), idt4ds, 8); memcpy(idt + (8 * 0x29), idt4ff, 8); memcpy(idt + (8 * 13), idt4gp, 8); memcpy(idt + (8 * 12), idt4ss, 8); memcpy(idt + (8 * 9), idt4cso, 8); memcpy(idt + (8*6), idt4ud, 8); memcpy(idt + (8 * 5), idt4br, 8); memcpy(idt + (8 * 4), idt4of, 8); memcpy(idt + (8 * 3), idt4bp, 8); memcpy(idt + (8 * 1), idt4db, 8); memcpy(idt + (8 * 0), idt4de, 8); ldt = (char*)RtlAllocateHeap(GetProcessHeap(), HEAP_ZERO_MEMORY, 256 * 8); return STATUS_SUCCESS; }
+	__declspec(dllexport) NTSTATUS WINAPI BTCpuThreadInit(void) { UINT32 idt4ud[] = IDT_x86_descriptor_gen(((UINT32)&Excroutine_UD_bop), 0x8); UINT32 idt4bp[] = IDT_x86_descriptor_gen(((UINT32)&Excroutine_BP_bop), 0x8); UINT32 idt4de[] = IDT_x86_descriptor_gen(((UINT32)&Excroutine_DE_bop), 0x8); idt = (char*)RtlAllocateHeap(GetProcessHeap(), HEAP_ZERO_MEMORY, 255 * 8); memcpy(idt + (8*6), idt4ud, 8); memcpy(idt + (8 * 3), idt4bp, 8); memcpy(idt + (8 * 0), idt4de, 8); ldt = (char*)RtlAllocateHeap(GetProcessHeap(), HEAP_ZERO_MEMORY, 256 * 8); return STATUS_SUCCESS; }
 	__declspec(dllexport) NTSTATUS WINAPI BTCpuResetToConsistentState(EXCEPTION_POINTERS* ptrs) { return STATUS_SUCCESS; }
 	__declspec(dllexport) NTSTATUS WINAPI BTCpuSetContext(HANDLE thread, HANDLE process, void* unknown, I386_CONTEXT* ctx) { return NtSetInformationThread_alternative(thread, ThreadWow64Context, ctx, sizeof(*ctx)); }
 	__declspec(dllexport) void WINAPI BTCpuSimulate(void) {
@@ -1430,6 +1428,7 @@ extern "C" {
 		t_CPU_RESET* CPU_RESET = 0;
 		t_CPU_BUS_SIZE_CHANGE* CPU_BUS_SIZE_CHANGE = 0;
 		t_CPU_SWITCH_PM* CPU_SWITCH_PM = 0;
+		//t_GET_CPU_exec_1step* GET_CPU_exec_1step = 0;
 		t_exec_1step* exec_1step = 0;
 		t_CPU_EXECUTE_INJIT* CPU_EXECUTE_INJIT = 0;
 
@@ -1453,9 +1452,12 @@ extern "C" {
 				void* HM = emusemaphore[EMU_ID].np21w;
 			}
 			else {
+				//Wow64DisableWow64FsRedirection(&oldvalue4wd);
 				HM = ULCloneLibrary(hmhm4dll);
+				//Wow64RevertWow64FsRedirection(oldvalue4wd);
 			}
 			if (HM == 0) { return; }
+			//ULExecDllMain(HM, 1);
 			if (EMU_ID != -1) {
 				CPU_GET_REGPTR = emusemaphore[EMU_ID].CPU_GET_REGPTR;
 				CPU_EXECUTE_CC = emusemaphore[EMU_ID].CPU_EXECUTE_CC;
@@ -1464,6 +1466,7 @@ extern "C" {
 				CPU_RESET = emusemaphore[EMU_ID].CPU_RESET;
 				CPU_BUS_SIZE_CHANGE = emusemaphore[EMU_ID].CPU_BUS_SIZE_CHANGE;
 				CPU_SWITCH_PM = emusemaphore[EMU_ID].CPU_SWITCH_PM;
+				//GET_CPU_exec_1step = emusemaphore[EMU_ID].GET_CPU_exec_1step;
 				exec_1step = emusemaphore[EMU_ID].exec_1step;
 				CPU_EXECUTE_INJIT = emusemaphore[EMU_ID].CPU_EXECUTE_INJIT;
 				if (emusemaphore[EMU_ID].notfirsttime == false) {
@@ -1503,11 +1506,120 @@ extern "C" {
 		if (memtmp == 0) { return; }
 		memtmp->i386core->s.baseclock = 0x7fffffff;
 		memtmp->setctn(wow_context, 1);
+#ifdef _ARM64_
+		/*
+		cmp w2,#0x0
+		beq writemem8
+		cmp w2,#0x1
+		beq readmem8
+		cmp w2,#0x10
+		beq writemem16
+		cmp w2,#0x11
+		beq readmem16
+		cmp w2,#0x20
+		beq writemem32
+		cmp w2,#0x21
+		beq readmem32
+		mov x3,x2
+		mov x2,x1
+		mov x1,x0
+		ldr x4,testvalue+0
+		ldr x0,testvalue+8
+		br x4
+		writemem8:
+		mov w0,w0
+		strb w1,[x0]
+		ret
+		readmem8:
+		mov w0,w0
+		ldrb w0,[x0]
+		ret
+		writemem16:
+		mov w0,w0
+		strh w1,[x0]
+		ret
+		readmem16:
+		mov w0,w0
+		ldrh w0,[x0]
+		ret
+		writemem32:
+		mov w0,w0
+		str w1,[x0]
+		ret
+		readmem32:
+		mov w0,w0
+		ldr w0,[x0]
+		ret
+		testvalue:
+		0x0000000000000000
+		0x0000000000000000
+		*/
+		char memaccess[] = { 0x5F,0x00,0x00,0x71,0x20,0x02,0x00,0x54,0x5F,0x04,0x00,0x71,0x40,0x02,0x00,0x54,0x5F,0x40,0x00,0x71,0x60,0x02,0x00,0x54,0x5F,0x44,0x00,0x71,0x80,0x02,0x00,0x54,0x5F,0x80,0x00,0x71,0xA0,0x02,0x00,0x54,0x5F,0x84,0x00,0x71,0xC0,0x02,0x00,0x54,0xE3,0x03,0x02,0xAA,0xE2,0x03,0x01,0xAA,0xE1,0x03,0x00,0xAA,0xA4,0x02,0x00,0x58,0xC0,0x02,0x00,0x58,0x80,0x00,0x1F,0xD6,0xE0,0x03,0x00,0x2A,0x01,0x00,0x00,0x39,0xC0,0x03,0x5F,0xD6,0xE0,0x03,0x00,0x2A,0x00,0x00,0x40,0x39,0xC0,0x03,0x5F,0xD6,0xE0,0x03,0x00,0x2A,0x01,0x00,0x00,0x79,0xC0,0x03,0x5F,0xD6,0xE0,0x03,0x00,0x2A,0x00,0x00,0x40,0x79,0xC0,0x03,0x5F,0xD6,0xE0,0x03,0x00,0x2A,0x01,0x00,0x00,0xB9,0xC0,0x03,0x5F,0xD6,0xE0,0x03,0x00,0x2A,0x00,0x00,0x40,0xB9,0xC0,0x03,0x5F,0xD6,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 };
+		(*(UINT64*)(&memaccess[144 + (8 * 0)])) = (UINT64)memtmp->i386memaccess;
+		(*(UINT64*)(&memaccess[144 + (8 * 1)])) = (UINT64)memtmp;
+#else
+#ifdef _X86_
+		/*
+		pop eax
+		push 0x12345678
+		push eax
+		mov eax,0
+		jmp eax
+		*/
+		char memaccess[] = { 0x58 ,0x68 ,0x78 ,0x56 ,0x34 ,0x12 ,0x50 ,0xB8 ,0x00 ,0x00 ,0x00 ,0x00 ,0xFF ,0xE0 };
+		(*(UINT32*)(&memaccess[0x08])) = (UINT32)memtmp->i386memaccess;
+		(*(UINT32*)(&memaccess[0x02])) = (UINT32)memtmp;
+#else
+		/*
+		mov r9,r8
+		mov r8,rdx
+		mov rdx,rcx
+		mov rcx,0x123456789abcdef
+		mov rax,0x123456789abcdef
+		jmp rax
+		*/
+		char memaccess[] = { 0x4D ,0x89 ,0xC1 ,0x49 ,0x89 ,0xD0 ,0x48 ,0x89 ,0xCA ,0x48 ,0xB9 ,0xEF ,0xCD ,0xAB ,0x89 ,0x67 ,0x45 ,0x23 ,0x01 ,0x48 ,0xB8 ,0xEF ,0xCD ,0xAB ,0x89 ,0x67 ,0x45 ,0x23 ,0x01 ,0xFF ,0xE0 };
+		(*(UINT64*)(&memaccess[0x15])) = (UINT64)memtmp->i386memaccess;
+		(*(UINT64*)(&memaccess[0x0b])) = (UINT64)memtmp;
+#endif
+#endif
 		(NtCurrentTeb()->TlsSlots[0]) = (PVOID)memtmp;
 		DWORD tmp;
-		CPU_SET_MACTLFC((UINT32(*)(int, int, int))memtmp->i386memaccess);
+#if 0
+		char* funcofmemaccess = 0;
+		if ((EMU_ID_OLD != EMU_ID) || (EMU_ID == -1)) {
+			if (EMU_ID != -1) { funcofmemaccess = emusemaphore[EMU_ID].funcofmemaccess; }
+			if (funcofmemaccess == 0) {
+				funcofmemaccess = (char*)VirtualAlloc(0, sizeof(memaccess), 0x3000, 0x40);
+				if (funcofmemaccess != 0) {
+					memcpy(funcofmemaccess, memaccess, sizeof(memaccess));
+				}
+				else { return; }
+				VirtualProtect(funcofmemaccess, sizeof(memaccess), 0x20, &tmp);
+				FlushInstructionCache(GetCurrentProcess(), funcofmemaccess, sizeof(memaccess));
+				if (EMU_ID != -1) { emusemaphore[EMU_ID].funcofmemaccess = funcofmemaccess; }
+				CPU_SET_MACTLFC((UINT32(*)(int, int, int))funcofmemaccess);
+			}
+		}
+#endif
+		CPU_SET_MACTLFC((UINT32(*)(int, int, int))i386memaccess_4e);
 		memtmp->i386finish = false;
-		while (memtmp->i386finish == false) { memtmp->i386core->s.remainclock = 0x7fffffff; while ((memtmp->i386finish == false) && ((memtmp->i386core->s.remainclock) > 0)) { exec_1step(); } }
+		//while (memtmp->i386finish == false) { memtmp->i386core->s.remainclock = 0x7fffffff; while ((memtmp->i386finish == false) && ((memtmp->i386core->s.remainclock) > 0)) { exec_1step(); } }
+		//printf("%08X08X\n", (((UINT64)&CPU_EXECUTE_INJIT) >> (32 * 1)), (((UINT64)&CPU_EXECUTE_INJIT) >> (32 * 0)));
+		//while (memtmp->i386finish == false) { memtmp->i386core->s.remainclock = 0x7fffffff; while ((memtmp->i386finish == false) && ((memtmp->i386core->s.remainclock) > 0)) { CPU_EXECUTE_INJIT(); } }
+		//memtmp->setntc(wow_context);
+		//while (memtmp->i386finish == false) { memtmp->i386core->s.remainclock = 200000000; while ((memtmp->i386finish == false) && ((memtmp->i386core->s.remainclock) > 0)) { exec_1step(); } }
+#if 1
+		if (jit_enabled == false) {
+			while (memtmp->i386finish == false) { memtmp->i386core->s.remainclock = 0x7fffffff; while ((memtmp->i386finish == false) && ((memtmp->i386core->s.remainclock) > 0)) { exec_1step(); } }
+		}
+		else {
+			while (memtmp->i386finish == false) { memtmp->i386core->s.remainclock = 0x7fffffff; while ((memtmp->i386finish == false) && ((memtmp->i386core->s.remainclock) > 0)) { CPU_EXECUTE_INJIT(); } }
+		}
+#else
+		while (memtmp->i386finish == false) { memtmp->i386core->s.remainclock = 0x7fffffff; CPU_EXECUTE_CC(0x7fffffff); }
+#endif
+		//memtmp->setntc(memtmp->i386_context);
 		UINT8 svctype = memtmp->wow64svctype;
 		if (EMU_ID != -1) {
 			emusemaphore[EMU_ID].inuse = false;
@@ -1515,6 +1627,7 @@ extern "C" {
 		else {
 			delete(memtmp);
 			ULFreeLibrary(HM);
+			//VirtualFree(funcofmemaccess, 0, 0x8000);
 		}
 		UINT32* p = (UINT32*)ULongToPtr(wow_context->Esp);
 		EMU_ID_OLD = EMU_ID;
