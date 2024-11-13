@@ -92,6 +92,8 @@ exception(int num, int error_code)
 	if ((CPU_STAT_EXCEPTION_COUNTER >= 3) 
 	 || (CPU_STAT_EXCEPTION_COUNTER == 2 && CPU_STAT_PREV_EXCEPTION == DF_EXCEPTION)) {
 		/* Triple fault */
+		extern UINT32(*i386memaccess) (int, int, int);
+		i386memaccess(0,0,8);
 		ia32_panic("exception: catch triple fault!");
 	}
 

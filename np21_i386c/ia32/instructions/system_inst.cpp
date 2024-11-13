@@ -1061,7 +1061,8 @@ RSM(void)
 	UINT32 op, src;
 	UINT32 reg;
 
-	if (CPU_STAT_CPL == 0xFF) { 
+	if (i386core.smm_mode) {
+		i386msr.reg.ia32_smbase_msr = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7ef8);
 			/*
 			 * 0 = PE (protect enable)
 			 * 1 = MP (monitor coprocesser)
@@ -1149,7 +1150,6 @@ RSM(void)
 		CPU_EDX = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7f6c);
 		CPU_ECX = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7f64);
 		CPU_EAX = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7f5c);
-		i386msr.reg.ia32_smbase_msr = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7ef8);
 		CPU_LDTR_BASE = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7e9c);
 		CPU_IDTR_BASE = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7e94);
 		CPU_GDTR_BASE = cpu_memoryread_d(i386msr.reg.ia32_smbase_msr + 0x7e8c);
@@ -1199,12 +1199,13 @@ RSM(void)
 		}
 		load_ldtr(CPU_LDTR, GP_EXCEPTION);
 		load_tr(CPU_TR);
-		load_descriptor(&CPU_STAT_SREG(CPU_GS_INDEX), CPU_GS);
-		load_descriptor(&CPU_STAT_SREG(CPU_FS_INDEX), CPU_FS);
-		load_descriptor(&CPU_STAT_SREG(CPU_DS_INDEX), CPU_DS);
-		load_descriptor(&CPU_STAT_SREG(CPU_SS_INDEX), CPU_SS);
-		load_descriptor(&CPU_STAT_SREG(CPU_CS_INDEX), CPU_CS);
-		load_descriptor(&CPU_STAT_SREG(CPU_ES_INDEX), CPU_ES);
+		LOAD_SEGREG(CPU_GS_INDEX, CPU_GS);
+		LOAD_SEGREG(CPU_FS_INDEX, CPU_FS);
+		LOAD_SEGREG(CPU_DS_INDEX, CPU_DS);
+		LOAD_SEGREG(CPU_SS_INDEX, CPU_SS);
+		LOAD_SEGREG(CPU_CS_INDEX, CPU_CS);
+		LOAD_SEGREG(CPU_ES_INDEX, CPU_ES);
+		i386core.smm_mode = 0;
 	}
 	else {
 		EXCEPTION(UD_EXCEPTION, 0);
@@ -1305,7 +1306,7 @@ RDTSC(void)
 	CPU_EDX = li.HighPart;
 	CPU_EAX = li.LowPart;
 #else
-	if(0){
+	if(1){
 		// CPUクロックに依存しないカウンタ値にする
 		UINT64 tsc_tmp;
 		if(CPU_REMCLOCK != -1){

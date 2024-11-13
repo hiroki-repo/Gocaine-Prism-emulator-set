@@ -470,6 +470,7 @@ typedef struct {
 typedef struct {
 	I386STAT	s;		/* STATsave'ed */
 	I386EXT		e;
+	UINT8 smm_mode;
 } I386CORE;
 
 #define I386CPUID_VERSION	1
@@ -1325,6 +1326,7 @@ void ia32shut(void);
 void ia32a20enable(BOOL enable);
 void ia32(void);
 void ia32_step(void);
+void ia32smi(void);
 void CPUCALL ia32_interrupt(int vect, int soft);
 
 void exec_1step(void);

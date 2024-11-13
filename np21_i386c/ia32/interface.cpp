@@ -364,3 +364,58 @@ ia32_bioscall(void)
 	}
 }
 #endif
+
+void
+ia32smi(void) {
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7ff8, CPU_CR0);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7ff0, CPU_CR3);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7fe8, CPU_EFLAG);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7fd8, CPU_EIP);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7fd0, CPU_DR6);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7fc8, CPU_DR7);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7fc4, CPU_TR);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7fc0, CPU_LDTR);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7fbc, CPU_GS);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7fb8, CPU_FS);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7fb4, CPU_DS);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7fb0, CPU_SS);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7fac, CPU_CS);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7fa8, CPU_ES);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7f94, CPU_EDI);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7f8c, CPU_ESI);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7f84, CPU_EBP);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7f7c, CPU_ESP);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7f74, CPU_EBX);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7f6c, CPU_EDX);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7f64, CPU_ECX);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7f5c, CPU_EAX);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7ef8, i386msr.reg.ia32_smbase_msr);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7e9c, CPU_LDTR_BASE);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7e94, CPU_IDTR_BASE);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7e8c, CPU_GDTR_BASE);
+	cpu_memorywrite_d(i386msr.reg.ia32_smbase_msr + 0x7e40, CPU_CR4);
+	CPU_INST_OP32 = CPU_INST_AS32 =
+		CPU_STATSAVE.cpu_inst_default.op_32 =
+		CPU_STATSAVE.cpu_inst_default.as_32 = 0;
+	CPU_STAT_SS32 = 0;
+	set_cpl(0);
+	CPU_STAT_PM = 0;
+	change_pg(0);
+	CS_BASE = i386msr.reg.ia32_smbase_msr;
+	CPU_STAT_SREGLIMIT(CPU_CS_INDEX) = 0xffffffff;
+	DS_BASE = 0;
+	CPU_STAT_SREGLIMIT(CPU_DS_INDEX) = 0xffffffff;
+	ES_BASE = 0;
+	CPU_STAT_SREGLIMIT(CPU_ES_INDEX) = 0xffffffff;
+	FS_BASE = 0;
+	CPU_STAT_SREGLIMIT(CPU_FS_INDEX) = 0xffffffff;
+	GS_BASE = 0;
+	CPU_STAT_SREGLIMIT(CPU_GS_INDEX) = 0xffffffff;
+	SS_BASE = 0;
+	CPU_STAT_SREGLIMIT(CPU_SS_INDEX) = 0xffffffff;
+	CPU_STAT_CPL = 0;
+	CPU_STAT_USER_MODE = (CPU_STAT_CPL == 3) ? CPU_MODE_USER : CPU_MODE_SUPERVISER;
+	CPU_EIP = 0x8000;
+	i386core.smm_mode = 1;
+	return;
+}
