@@ -1,4 +1,5 @@
 #include "windows.h"
+#include "np21_i386c/ia32/cpu.h"
 //#include "compiler.h"
 
 /*BOOL APIENTRY DllMain (HMODULE hModule,
@@ -114,95 +115,95 @@ void CPU_SET_MACTLFC(UINT32 (*ptrformaf) (int, int, int))
 extern UINT32 read_dword(UINT32 byteaddress);
 
 UINT8 readbyte_emubus_0(UINT32 byteaddress) {
-	return ((i386memaccess(((int)byteaddress) + 0, 0, 1) & 0xFF) << (8 * 0));
+	return ((i386memaccess(((int)byteaddress) + 0, 0, 1 | (((i386core.smm_mode) ? 1 : 0) << 2)) & 0xFF) << (8 * 0));
 }
 UINT8 readbyte_realbus(UINT32 byteaddress) {
-	return ((i386memaccess(((int)byteaddress) + 0, 0, 1) >> (8 * (byteaddress & 3))) & 0xFF);
+	return ((i386memaccess(((int)byteaddress) + 0, 0, 1 | (((i386core.smm_mode) ? 1 : 0) << 2)) >> (8 * (byteaddress & 3))) & 0xFF);
 }
 UINT8(*readbyte_funcs[])(UINT32) = { readbyte_emubus_0,readbyte_emubus_0,readbyte_emubus_0,readbyte_emubus_0,readbyte_realbus,readbyte_realbus,readbyte_realbus,readbyte_realbus };
 UINT8(*readbyte_func)(UINT32) = *readbyte_funcs[0];
 UINT16 readword_emubus_0(UINT32 byteaddress) {
-	return ((i386memaccess(((int)byteaddress) + 0, 0, 1) & 0xFF) << (8 * 0)) | ((i386memaccess(((int)byteaddress) + 1, 0, 1) & 0xFF) << (8 * 1));
+	return ((i386memaccess(((int)byteaddress) + 0, 0, 1 | (((i386core.smm_mode) ? 1 : 0) << 2)) & 0xFF) << (8 * 0)) | ((i386memaccess(((int)byteaddress) + 1, 0, 1 | (((i386core.smm_mode) ? 1 : 0) << 2)) & 0xFF) << (8 * 1));
 }
 UINT16 readword_emubus_1(UINT32 byteaddress) {
-	return ((i386memaccess(((int)byteaddress) + 0, 0, 1 | 0x10) & 0xFFFF) << (16 * 0));
+	return ((i386memaccess(((int)byteaddress) + 0, 0, 1 | (((i386core.smm_mode) ? 1 : 0) << 2) | 0x10) & 0xFFFF) << (16 * 0));
 }
 UINT16 readword_realbus(UINT32 byteaddress) {
 	if ((byteaddress & 3) == 3) {
-		return ((((i386memaccess(((int)byteaddress) + 0, 0, 1 | 0x10) >> (8 * 3)) & 0xFF) | ((i386memaccess(((int)byteaddress) + 1, 0, 1 | 0x10) << (8 * 1)) & 0xFF00)) & 0xFFFF);
+		return ((((i386memaccess(((int)byteaddress) + 0, 0, 1 | (((i386core.smm_mode) ? 1 : 0) << 2) | 0x10) >> (8 * 3)) & 0xFF) | ((i386memaccess(((int)byteaddress) + 1, 0, 1 | (((i386core.smm_mode) ? 1 : 0) << 2) | 0x10) << (8 * 1)) & 0xFF00)) & 0xFFFF);
 	}
 	else {
-		return ((i386memaccess(((int)byteaddress) + 0, 0, 1 | 0x10) >> (8 * (byteaddress & 3))) & 0xFFFF);
+		return ((i386memaccess(((int)byteaddress) + 0, 0, 1 | (((i386core.smm_mode) ? 1 : 0) << 2) | 0x10) >> (8 * (byteaddress & 3))) & 0xFFFF);
 	}
 }
 UINT16(*readword_funcs[])(UINT32) = { readword_emubus_0,readword_emubus_1,readword_emubus_1,readword_emubus_1,readword_realbus,readword_realbus,readword_realbus,readword_realbus };
 UINT16(*readword_func)(UINT32) = *readword_funcs[0];
 UINT32 readdword_emubus_0(UINT32 byteaddress) {
-	return ((i386memaccess(((int)byteaddress) + 0, 0, 1) & 0xFF) << (8 * 0)) | ((i386memaccess(((int)byteaddress) + 1, 0, 1) & 0xFF) << (8 * 1)) | ((i386memaccess(((int)byteaddress) + 2, 0, 1) & 0xFF) << (8 * 2)) | ((i386memaccess(((int)byteaddress) + 3, 0, 1) & 0xFF) << (8 * 3));
+	return ((i386memaccess(((int)byteaddress) + 0, 0, 1 | (((i386core.smm_mode) ? 1 : 0) << 2)) & 0xFF) << (8 * 0)) | ((i386memaccess(((int)byteaddress) + 1, 0, 1 | (((i386core.smm_mode) ? 1 : 0) << 2)) & 0xFF) << (8 * 1)) | ((i386memaccess(((int)byteaddress) + 2, 0, 1 | (((i386core.smm_mode) ? 1 : 0) << 2)) & 0xFF) << (8 * 2)) | ((i386memaccess(((int)byteaddress) + 3, 0, 1 | (((i386core.smm_mode) ? 1 : 0) << 2)) & 0xFF) << (8 * 3));
 }
 UINT32 readdword_emubus_1(UINT32 byteaddress) {
-	return ((i386memaccess(((int)byteaddress) + 0, 0, 1 | 0x10) & 0xFFFF) << (16 * 0)) | ((i386memaccess(((int)byteaddress) + 2, 0, 1 | 0x10) & 0xFFFF) << (16 * 1));
+	return ((i386memaccess(((int)byteaddress) + 0, 0, 1 | (((i386core.smm_mode) ? 1 : 0) << 2) | 0x10) & 0xFFFF) << (16 * 0)) | ((i386memaccess(((int)byteaddress) + 2, 0, 1 | (((i386core.smm_mode) ? 1 : 0) << 2) | 0x10) & 0xFFFF) << (16 * 1));
 }
 UINT32 readdword_emubus_2(UINT32 byteaddress) {
-	return i386memaccess(((int)byteaddress) + 0, 0, 1 | 0x20);
+	return i386memaccess(((int)byteaddress) + 0, 0, 1 | (((i386core.smm_mode) ? 1 : 0) << 2) | 0x20);
 }
 UINT32 readdword_realbus(UINT32 byteaddress) {
 	if ((byteaddress & 3) == 0) {
-		return i386memaccess(((int)byteaddress) + 0, 0, 1 | 0x20);
+		return i386memaccess(((int)byteaddress) + 0, 0, 1 | (((i386core.smm_mode) ? 1 : 0) << 2) | 0x20);
 	}
 	else {
-		return (((i386memaccess(((int)byteaddress) + 0, 0, 1 | 0x20) >> (8 * (byteaddress & 3))) & ((1 << (8 * (byteaddress & 3))) - 1)) | (((i386memaccess(((int)byteaddress) + 4, 0, 1 | 0x20) >> (8 * 0)) & ((1 << (8 * (4 - (byteaddress & 3)))) - 1)) << (8 * (byteaddress & 3)))) & 0xFFFFFFFF;
+		return (((i386memaccess(((int)byteaddress) + 0, 0, 1 | (((i386core.smm_mode) ? 1 : 0) << 2) | 0x20) >> (8 * (byteaddress & 3))) & ((1 << (8 * (byteaddress & 3))) - 1)) | (((i386memaccess(((int)byteaddress) + 4, 0, 1 | (((i386core.smm_mode) ? 1 : 0) << 2) | 0x20) >> (8 * 0)) & ((1 << (8 * (4 - (byteaddress & 3)))) - 1)) << (8 * (byteaddress & 3)))) & 0xFFFFFFFF;
 	}
 }
 UINT32(*readdword_funcs[])(UINT32) = { readdword_emubus_0,readdword_emubus_1,readdword_emubus_2,readdword_emubus_2,readdword_realbus,readdword_realbus,readdword_realbus,readdword_realbus };
 UINT32(*readdword_func)(UINT32) = *readdword_funcs[0];
 
 void writebyte_emubus_0(UINT32 byteaddress, UINT8 data) {
-	i386memaccess(((int)byteaddress) + 0, (UINT8)data, 0);
+	i386memaccess(((int)byteaddress) + 0, (UINT8)data, 0 | (((i386core.smm_mode) ? 1 : 0) << 2));
 }
 void writebyte_realbus(UINT32 byteaddress, UINT8 data) {
-	i386memaccess(((int)byteaddress) + 0, (read_dword(byteaddress & 0xFFFFFFFC) & (~(0xFF << (8 * (byteaddress & 3))))) | (((UINT8)data) << (8 * (byteaddress & 3))), 0);
+	i386memaccess(((int)byteaddress) + 0, (read_dword(byteaddress & 0xFFFFFFFC) & (~(0xFF << (8 * (byteaddress & 3))))) | (((UINT8)data) << (8 * (byteaddress & 3))), 0 | (((i386core.smm_mode) ? 1 : 0) << 2));
 }
 void(*writebyte_funcs[])(UINT32, UINT8) = { writebyte_emubus_0,writebyte_emubus_0,writebyte_emubus_0,writebyte_emubus_0,writebyte_realbus,writebyte_realbus,writebyte_realbus,writebyte_realbus };
 void(*writebyte_func)(UINT32, UINT8) = *writebyte_funcs[0];
 void writeword_emubus_0(UINT32 byteaddress, UINT16 data) {
-	i386memaccess(((int)byteaddress) + 0, (UINT8)(data >> (8 * 0)), 0);
-	i386memaccess(((int)byteaddress) + 1, (UINT8)(data >> (8 * 1)), 0);
+	i386memaccess(((int)byteaddress) + 0, (UINT8)(data >> (8 * 0)), 0 | (((i386core.smm_mode) ? 1 : 0) << 2));
+	i386memaccess(((int)byteaddress) + 1, (UINT8)(data >> (8 * 1)), 0 | (((i386core.smm_mode) ? 1 : 0) << 2));
 }
 void writeword_emubus_1(UINT32 byteaddress, UINT16 data) {
-	i386memaccess(((int)byteaddress) + 0, (data >> (16 * 0)), 0 | 0x10);
+	i386memaccess(((int)byteaddress) + 0, (data >> (16 * 0)), 0 | (((i386core.smm_mode) ? 1 : 0) << 2) | 0x10);
 }
 void writeword_realbus(UINT32 byteaddress, UINT16 data) {
 	if ((byteaddress & 3) == 3) {
-		i386memaccess(((int)byteaddress) + 0, (read_dword(byteaddress & 0xFFFFFFFC) & (~(0xFF << (8 * (byteaddress & 3))))) | ((data << (8 * 3)) & 0xFF000000), 0 | 0x10);
-		i386memaccess(((int)byteaddress) + 1, (read_dword((byteaddress + 1) & 0xFFFFFFFC) & (~(0xFF << (8 * 0)))) | ((data >> (8 * 1)) & 0xFF), 0 | 0x10);
+		i386memaccess(((int)byteaddress) + 0, (read_dword(byteaddress & 0xFFFFFFFC) & (~(0xFF << (8 * (byteaddress & 3))))) | ((data << (8 * 3)) & 0xFF000000), 0 | (((i386core.smm_mode) ? 1 : 0) << 2) | 0x10);
+		i386memaccess(((int)byteaddress) + 1, (read_dword((byteaddress + 1) & 0xFFFFFFFC) & (~(0xFF << (8 * 0)))) | ((data >> (8 * 1)) & 0xFF), 0 | (((i386core.smm_mode) ? 1 : 0) << 2) | 0x10);
 	}
 	else {
-		i386memaccess(((int)byteaddress) + 0, (read_dword(byteaddress & 0xFFFFFFFC) & (~(0xFFFF << (8 * (byteaddress & 3))))) | (data << (8 * (byteaddress & 3))), 0 | 0x10);
+		i386memaccess(((int)byteaddress) + 0, (read_dword(byteaddress & 0xFFFFFFFC) & (~(0xFFFF << (8 * (byteaddress & 3))))) | (data << (8 * (byteaddress & 3))), 0 | (((i386core.smm_mode) ? 1 : 0) << 2) | 0x10);
 	}
 }
 void(*writeword_funcs[])(UINT32, UINT16) = { writeword_emubus_0,writeword_emubus_1,writeword_emubus_1,writeword_emubus_1,writeword_realbus,writeword_realbus,writeword_realbus,writeword_realbus };
 void(*writeword_func)(UINT32, UINT16) = *writeword_funcs[0];
 void writedword_emubus_0(UINT32 byteaddress, UINT32 data) {
-	i386memaccess(((int)byteaddress) + 0, (UINT8)(data >> (8 * 0)), 0);
-	i386memaccess(((int)byteaddress) + 1, (UINT8)(data >> (8 * 1)), 0);
-	i386memaccess(((int)byteaddress) + 2, (UINT8)(data >> (8 * 2)), 0);
-	i386memaccess(((int)byteaddress) + 3, (UINT8)(data >> (8 * 3)), 0);
+	i386memaccess(((int)byteaddress) + 0, (UINT8)(data >> (8 * 0)), 0 | (((i386core.smm_mode) ? 1 : 0) << 2));
+	i386memaccess(((int)byteaddress) + 1, (UINT8)(data >> (8 * 1)), 0 | (((i386core.smm_mode) ? 1 : 0) << 2));
+	i386memaccess(((int)byteaddress) + 2, (UINT8)(data >> (8 * 2)), 0 | (((i386core.smm_mode) ? 1 : 0) << 2));
+	i386memaccess(((int)byteaddress) + 3, (UINT8)(data >> (8 * 3)), 0 | (((i386core.smm_mode) ? 1 : 0) << 2));
 }
 void writedword_emubus_1(UINT32 byteaddress, UINT32 data) {
-	i386memaccess(((int)byteaddress) + 0, (data >> (16 * 0)), 0 | 0x10);
-	i386memaccess(((int)byteaddress) + 2, (data >> (16 * 1)), 0 | 0x10);
+	i386memaccess(((int)byteaddress) + 0, (data >> (16 * 0)), 0 | (((i386core.smm_mode) ? 1 : 0) << 2) | 0x10);
+	i386memaccess(((int)byteaddress) + 2, (data >> (16 * 1)), 0 | (((i386core.smm_mode) ? 1 : 0) << 2) | 0x10);
 }
 void writedword_emubus_2(UINT32 byteaddress, UINT32 data) {
-	i386memaccess(((int)byteaddress) + 0, (data), 0 | 0x20);
+	i386memaccess(((int)byteaddress) + 0, (data), 0 | (((i386core.smm_mode) ? 1 : 0) << 2) | 0x20);
 }
 void writedword_realbus(UINT32 byteaddress, UINT32 data) {
 	if ((byteaddress & 3) == 0) {
-		i386memaccess(((int)byteaddress) + 0, (data), 0 | 0x20);
+		i386memaccess(((int)byteaddress) + 0, (data), 0 | (((i386core.smm_mode) ? 1 : 0) << 2) | 0x20);
 	}
 	else {
-		i386memaccess(((int)byteaddress) + 0, ((read_dword(byteaddress & 0xFFFFFFFC) & ((1 << (8 * (byteaddress & 3))) - 1)) | ((data << (8 * (byteaddress & 3))) & (~((1 << (8 * (byteaddress & 3))) - 1)))), 0 | 0x20);
-		i386memaccess(((int)byteaddress) + 4, ((read_dword((byteaddress + 4) & 0xFFFFFFFC) & (((1 << (8 * (4 - (byteaddress & 3)))) - 1) << (8 * (byteaddress & 3)))) | ((data >> (8 * (4 - (byteaddress & 3)))) & ((1 << (8 * (byteaddress & 3))) - 1))), 0 | 0x20);
+		i386memaccess(((int)byteaddress) + 0, ((read_dword(byteaddress & 0xFFFFFFFC) & ((1 << (8 * (byteaddress & 3))) - 1)) | ((data << (8 * (byteaddress & 3))) & (~((1 << (8 * (byteaddress & 3))) - 1)))), 0 | (((i386core.smm_mode) ? 1 : 0) << 2) | 0x20);
+		i386memaccess(((int)byteaddress) + 4, ((read_dword((byteaddress + 4) & 0xFFFFFFFC) & (((1 << (8 * (4 - (byteaddress & 3)))) - 1) << (8 * (byteaddress & 3)))) | ((data >> (8 * (4 - (byteaddress & 3)))) & ((1 << (8 * (byteaddress & 3))) - 1))), 0 | (((i386core.smm_mode) ? 1 : 0) << 2) | 0x20);
 	}
 }
 void(*writedword_funcs[])(UINT32, UINT32) = { writedword_emubus_0,writedword_emubus_1,writedword_emubus_2,writedword_emubus_2,writedword_realbus,writedword_realbus,writedword_realbus,writedword_realbus };
@@ -1193,6 +1194,10 @@ void CPU_REQ_INTERRUPT(int vect)
 {
 	/*irq_pending = TRUE;
 	pic_ack_vector = vect;*/
+	if (CPU_STAT_HLT) {
+		CPU_EIP++;
+		CPU_STAT_HLT = 0;
+	}
 	if (CPU_isEI) {
 		CPU_INTERRUPT(vect, 0);
 	}
@@ -1295,3 +1300,7 @@ extern "C" __declspec(dllexport) void* GET_CPU_exec_allstep() { return &exec_all
 
 #include "np21_i386c/ia32/jit.h"
 extern "C" __declspec(dllexport) UINT64 CPU_EXECUTE_INJIT() { return exec_jit(); }
+
+extern "C" __declspec(dllexport) void CPU_RESET_ONLY() { ia32reset(); }
+
+extern "C" __declspec(dllexport) void CPU_REQ_SMI() { ia32smi(); }
