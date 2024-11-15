@@ -1200,6 +1200,7 @@ public:
 #else
 				_this->wow64svctype = 1;
 				//_this->i386finish = true;
+				_this->i386core->s.cpu_tsc -= _this->i386core->s.remainclock;
 				_this->i386core->s.remainclock = 0;
 #endif
 			}
@@ -1213,6 +1214,7 @@ public:
 #else
 				_this->wow64svctype = 2;
 				//_this->i386finish = true;
+				_this->i386core->s.cpu_tsc -= _this->i386core->s.remainclock;
 				_this->i386core->s.remainclock = 0;
 #endif
 			}
@@ -1407,9 +1409,11 @@ extern "C" {
 		memtmp->wow64svctype = 0;
 		memtmp->i386finish = false;
 		UINT32* p;
+		UINT64 baseclk = 0;
 x86executemain:
 		NtCurrentTeb()->TlsSlots[60] = (void*)3;
-		memtmp->i386core->s.baseclock = 0x7fffffff; memtmp->i386core->s.remainclock = 0x7fffffff; exec_1step();
+		memtmp->i386core->s.baseclock = 0x7fffffff;
+		baseclk = memtmp->i386core->s.baseclock; memtmp->i386core->s.cpu_tsc += memtmp->i386core->s.baseclock; memtmp->i386core->s.remainclock = 0x7fffffff; exec_1step(); memtmp->i386core->s.cpu_tsc = memtmp->i386core->s.cpu_tsc - baseclk + memtmp->i386core->s.baseclock;
 		UINT8 svctype = memtmp->wow64svctype;
 		if (memtmp->wow64svctype == 1) { NtCurrentTeb()->TlsSlots[60] = (void*)4; memtmp->wow64svctype = 0; ret = Wow64SystemServiceEx(wow_context->Eax, (UINT*)ULongToPtr(wow_context->Esp + 8)); if (NtCurrentTeb()->TlsSlots[60] == 0) { return; } wow_context->Eax = ret; if (NtCurrentTeb()->TlsSlots[60] == (void*)5 && ((memaccessandpt*)(NtCurrentTeb()->TlsSlots[63]))->i386finish == true) { goto x86emustop___; } if (memtmp->i386finish == true) { goto x86emustop; } memtmp->setctn(wow_context, 0); goto x86executemain; }
 		else if (memtmp->wow64svctype == 2) { NtCurrentTeb()->TlsSlots[60] = (void*)4; memtmp->wow64svctype = 0; p = (UINT32*)ULongToPtr(wow_context->Esp); if (p__wine_unix_call != 0) { ret = p__wine_unix_call((*(UINT64*)((void*)&p[1])), (UINT32)p[3], ULongToPtr(p[4])); } else { ret = 0xffffffff; } if (NtCurrentTeb()->TlsSlots[60] == 0) { return; } wow_context->Eax = ret; if (NtCurrentTeb()->TlsSlots[60] == (void*)5 && ((memaccessandpt*)(NtCurrentTeb()->TlsSlots[63]))->i386finish == true) { goto x86emustop___; } if (memtmp->i386finish == true) { goto x86emustop; } memtmp->setctn(wow_context, 0); goto x86executemain; }
